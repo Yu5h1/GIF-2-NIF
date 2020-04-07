@@ -7,5 +7,7 @@ Convert GIF to NIF
 
 
 ## Thanks
+
 NifTools team
+
 Visual Studio Community
