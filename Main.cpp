@@ -12,9 +12,9 @@
 
 using namespace std;
 std::string GifUtil::GifConvertInfo::filterColor = "";
-int GifUtil::GifConvertInfo::OutputWidth = 1024;
-int GifUtil::GifConvertInfo::OutputHeight = 1024;
+int GifUtil::GifConvertInfo::OutputTextureSize = 1024;
 extern float MaxMeshSize = 50;
+extern float averageFrameRate = 0.1f;
 
 string GifMeshTemplate() { return (getAppFolder() + "\\GifMeshTemplate.nif"); }
 bool DoesMeshTemplateExists() {
@@ -22,8 +22,7 @@ bool DoesMeshTemplateExists() {
 }
 
 void GenerateGifAssets(std::string gifImagePath, bool IsSpecialEdition = false,
-	string GameDataFolderPath = "",
-	float averageFrameRate = 0.1f)
+	string GameDataFolderPath = "")
 {
 	bool useGameFolder = GameDataFolderPath != "";
 	if (System::IO::File::Exists(gcnew System::String(gifImagePath.c_str())) == false) {
@@ -82,7 +81,7 @@ void GenerateGifAssets(std::string gifImagePath, bool IsSpecialEdition = false,
 	if (spriteDimension < 2) return;
 	if (System::IO::File::Exists(outputPng)) {
 		auto texconv = gcnew System::String((appFolder + "\\texconv.exe").c_str());
-		System::String^ textureSizeStr = gcnew System::String(to_string(GifUtil::GifConvertInfo::OutputWidth).c_str());
+		System::String^ textureSizeStr = gcnew System::String(to_string(GifUtil::GifConvertInfo::OutputTextureSize).c_str());
 		if (System::IO::File::Exists(texconv)) {
 			Process^ convertddsProcess = gcnew Process();
 			convertddsProcess->StartInfo->FileName = texconv;
@@ -184,7 +183,7 @@ int main(int argc, char* argv[], char* const envp[])
 {	
 	bool IsSpecialEdition = false;
 	string GameDataFolderPath = "";
-	float averageFrameRate = 0.1f;		
+
 	auto appName = System::IO::Path::GetFileNameWithoutExtension(gcnew System::String(getAppPath().c_str()));
 	auto config = gcnew System::String(getAppFolder().c_str()) + "\\" + appName + ".config";
 	if (System::IO::File::Exists(config)) {
@@ -196,10 +195,7 @@ int main(int argc, char* argv[], char* const envp[])
 			stringstream ss(val);
 			if (data[0]->ToLower() == "gamedatapath") GameDataFolderPath = val;
 			if (data[0]->ToLower() == "averageframerate") ss >> averageFrameRate;
-			if (data[0]->ToLower() == "texturesize") {
-				ss >> GifUtil::GifConvertInfo::OutputWidth;
-				GifUtil::GifConvertInfo::OutputHeight = GifUtil::GifConvertInfo::OutputWidth;
-			} 
+			if (data[0]->ToLower() == "texturesize") { ss >> GifUtil::GifConvertInfo::OutputTextureSize; }
 			if (data[0]->ToLower() == "maxmeshsize") ss >> MaxMeshSize;
 			if (data[0]->ToLower() == "filtercolor") GifUtil::GifConvertInfo::filterColor = val;
 		}
@@ -227,7 +223,7 @@ int main(int argc, char* argv[], char* const envp[])
 	for (size_t i = 1; i < argc; i++)
 	{
 		if (System::IO::Path::GetExtension(gcnew System::String(argv[i]))->ToLower() == ".gif")
-			GenerateGifAssets(argv[i], IsSpecialEdition, GameDataFolderPath, averageFrameRate);
+			GenerateGifAssets(argv[i], IsSpecialEdition, GameDataFolderPath);
 		else print("\nFailed to convert" + string(argv[i]));
 	}
 	

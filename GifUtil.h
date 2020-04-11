@@ -17,8 +17,7 @@ namespace GifUtil
 	class GifConvertInfo {
 	public:
 		static std::string filterColor;
-		static int OutputWidth;
-		static int OutputHeight;
+		static int OutputTextureSize;
 	private:
 	};
 
