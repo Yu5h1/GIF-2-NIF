@@ -3,7 +3,18 @@
 
 namespace GifUtil
 {
-
+	void UseBlackAsAlpha(Bitmap^ map)
+	{
+		for (int x = 0; x < map->Width; x++)
+		{
+			for (int y = 0; y < map->Height; y++)
+			{
+				Color pixel = map->GetPixel(x, y);
+				pixel = Color::FromArgb(((pixel.R + pixel.G + pixel.B) / 3), pixel.R, pixel.G, pixel.B);
+				map->SetPixel(x, y, pixel);
+			}
+		}
+	}
 
 	std::vector<float> ConvertToSpriteSheets(System::String^ sourcePath,
 		int splitValue, int& width, int& height, float& timeLength,
@@ -11,6 +22,7 @@ namespace GifUtil
 	{
 		System::String^ targetName = System::IO::Path::GetFileName(sourcePath);
 		Image^ gifImg = Image::FromFile(sourcePath);
+		
 		FrameDimension^ dimension = gcnew FrameDimension(gifImg->FrameDimensionsList[0]);
 		int frameCount = gifImg->GetFrameCount(dimension);
 		cli::array<unsigned char>^ times = gifImg->GetPropertyItem(0x5100)->Value;
@@ -41,12 +53,14 @@ namespace GifUtil
 			}
 			spriteDimension = (int)(System::Math::Ceiling(System::Math::Sqrt(frameCountPerSplit)));
 
-			int finalWidth = spriteDimension * (gifImg->Width + 2);
-			int finalHeight = spriteDimension * (gifImg->Height + 2);
+			int frameWidth = gifImg->Width;
+			int frameHeight = gifImg->Height;
 
+			int finalWidth = spriteDimension * (frameWidth + 2);
+			int finalHeight = spriteDimension * (frameHeight + 2);
 
 			Bitmap^ finalSprite = gcnew Bitmap(finalWidth, finalHeight);
-
+			
 			try
 			{
 				Graphics^ canvas = Graphics::FromImage(finalSprite);
@@ -59,10 +73,10 @@ namespace GifUtil
 						col = i - row * spriteDimension;
 						gifImg->SelectActiveFrame(dimension, i + k * frameCountPerSplit + (k >= extraFrame ? extraFrame : 0));
 
-						Bitmap^ frame = gcnew Bitmap(gifImg);
+						Bitmap^ frame = gcnew Bitmap(gifImg, frameWidth, frameHeight);
 						try
 						{
-							canvas->DrawImage(frame, col * (gifImg->Width + 2) + 1, row * (gifImg->Height + 2) + 1);
+							canvas->DrawImage(frame, col * (frameWidth + 2) + 1, row * (frameHeight + 2) + 1);
 						}
 						finally{ delete frame; }
 						System::Console::Write("\r" + targetName + "...{0}%   ", (i / (float)frameCountPerSplit) * 100);
@@ -70,6 +84,10 @@ namespace GifUtil
 					canvas->Save();
 					if (outputPath == System::String::Empty)
 						outputPath = sourcePath->Substring(0, sourcePath->ToCharArray()->Length - 4) + ".png";
+					
+					if (GifUtil::GifConvertInfo::filterColor == "black") {
+						UseBlackAsAlpha(finalSprite);
+					}
 					finalSprite->Save(outputPath, ImageFormat::Png);
 				}
 				finally{ delete canvas; }
@@ -77,6 +95,7 @@ namespace GifUtil
 			finally{ delete finalSprite; }
 
 		}
+		
 		System::Console::Write("\rGenerating " + targetName + "...{0}%\n", 100);
 		return results;
 	}

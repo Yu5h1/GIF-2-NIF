@@ -11,6 +11,10 @@
 #include <Resources.h>
 
 using namespace std;
+std::string GifUtil::GifConvertInfo::filterColor = "";
+int GifUtil::GifConvertInfo::OutputWidth = 1024;
+int GifUtil::GifConvertInfo::OutputHeight = 1024;
+extern float MaxMeshSize = 50;
 
 string GifMeshTemplate() { return (getAppFolder() + "\\GifMeshTemplate.nif"); }
 bool DoesMeshTemplateExists() {
@@ -19,8 +23,7 @@ bool DoesMeshTemplateExists() {
 
 void GenerateGifAssets(std::string gifImagePath, bool IsSpecialEdition = false,
 	string GameDataFolderPath = "",
-	float averageFrameRate = 0.1f,
-	int textureSize = 1024)
+	float averageFrameRate = 0.1f)
 {
 	bool useGameFolder = GameDataFolderPath != "";
 	if (System::IO::File::Exists(gcnew System::String(gifImagePath.c_str())) == false) {
@@ -64,8 +67,8 @@ void GenerateGifAssets(std::string gifImagePath, bool IsSpecialEdition = false,
 		GenerateGifMesh(gcnew System::String(nifoutput.c_str()));
 		target.Load(nifoutput);
 	}
-
 	
+	//target.SetNodeName(0, gifName.c_str());
 
 	float timeLength = 0;
 	int gifWidth, gifHeight;
@@ -79,7 +82,7 @@ void GenerateGifAssets(std::string gifImagePath, bool IsSpecialEdition = false,
 	if (spriteDimension < 2) return;
 	if (System::IO::File::Exists(outputPng)) {
 		auto texconv = gcnew System::String((appFolder + "\\texconv.exe").c_str());
-		System::String^ textureSizeStr = gcnew System::String(to_string(textureSize).c_str());
+		System::String^ textureSizeStr = gcnew System::String(to_string(GifUtil::GifConvertInfo::OutputWidth).c_str());
 		if (System::IO::File::Exists(texconv)) {
 			Process^ convertddsProcess = gcnew Process();
 			convertddsProcess->StartInfo->FileName = texconv;
@@ -93,17 +96,11 @@ void GenerateGifAssets(std::string gifImagePath, bool IsSpecialEdition = false,
 			MsgBox("texconv.exe\n does not exist.\n failed convert to DDS");
 		}
 	}
-	int halfWidth = gifWidth / 2;
-	int halfHeight = gifHeight / 2;
 
-	int biggerLength = halfWidth;
-	if (halfWidth < halfHeight) biggerLength = halfHeight;
-	float diff = 0;
-	if (biggerLength > 50) {
-		diff = ((float)biggerLength) / 50.0f;
-		halfHeight = halfHeight / diff;
-		halfWidth = halfWidth / diff;
-	}
+	float diff = (gifWidth < gifHeight ? gifHeight : gifWidth) / (MaxMeshSize < 1 ? 20 : MaxMeshSize);
+	
+	float halfHeight = (gifHeight / diff)*0.5f;
+	float halfWidth = (gifWidth / diff)*0.5f;
 
 	float uvInterval = 1.0f / spriteDimension;
 	for (auto &refShape : target.GetShapes()) {
@@ -184,11 +181,10 @@ void GenerateGifAssets(std::string gifImagePath, bool IsSpecialEdition = false,
 }
 
 int main(int argc, char* argv[], char* const envp[])
-{
-	bool IsSpecialEdition = true;
+{	
+	bool IsSpecialEdition = false;
 	string GameDataFolderPath = "";
-	float averageFrameRate = 0.1f;
-	int textureSize = 1024;
+	float averageFrameRate = 0.1f;		
 	auto appName = System::IO::Path::GetFileNameWithoutExtension(gcnew System::String(getAppPath().c_str()));
 	auto config = gcnew System::String(getAppFolder().c_str()) + "\\" + appName + ".config";
 	if (System::IO::File::Exists(config)) {
@@ -198,28 +194,32 @@ int main(int argc, char* argv[], char* const envp[])
 			auto data = lines[i]->Split('=');
 			auto val = MarshalString(data[1]);
 			stringstream ss(val);
-			if (data[0]->ToLower() == "gamedatapath") {
-				GameDataFolderPath = val;
-			}
-			if (data[0]->ToLower() == "averageframerate") {
-				ss >> averageFrameRate;
-			}
+			if (data[0]->ToLower() == "gamedatapath") GameDataFolderPath = val;
+			if (data[0]->ToLower() == "averageframerate") ss >> averageFrameRate;
 			if (data[0]->ToLower() == "texturesize") {
-				ss >> textureSize;
-			}
+				ss >> GifUtil::GifConvertInfo::OutputWidth;
+				GifUtil::GifConvertInfo::OutputHeight = GifUtil::GifConvertInfo::OutputWidth;
+			} 
+			if (data[0]->ToLower() == "maxmeshsize") ss >> MaxMeshSize;
+			if (data[0]->ToLower() == "filtercolor") GifUtil::GifConvertInfo::filterColor = val;
 		}
 		if (averageFrameRate <= 0) averageFrameRate = 0.1f;
 	}
 	else {
-		System::IO::File::WriteAllText(config, "GameDataPath=\naverageFrameRate=0.1f\nTextureSize=1024");
+		System::IO::File::WriteAllText(config, gcnew System::String(
+			"GameDataPath=\n"+
+			"averageFrameRate=0.1f\n"+
+			"TextureSize=1024\n"+
+			"maxMeshSize=50\n"+
+			"FilterColor=black\n"
+		));
 	}
 	if (argc == 1) {
-		string versionText = "SpecialEdition (SE)";
-		if (IsSpecialEdition == false) versionText = "Legendary Edition (LE)";
-		MsgBox("Welecom to use Skyrim Gif " + versionText + "\n\nDrag drop some gif files on this app.\nPlease download \"texconv\" for convert dds. \n\n[Configuration]\nGameDataPath="
-			+ GameDataFolderPath + "\nAverageframerate="
-			+ to_string(averageFrameRate)
-			+ "\nTextureSize=" + to_string(textureSize)
+		MsgBox("Welecom to use Skyrim Gif " + 
+			string(IsSpecialEdition ? "SpecialEdition (SE)" : "Legendary Edition (LE)") +
+			"\n\nUsage:\n" +
+			"Drag drop your gif files over this app then drop.\n"+
+			"Please download \"texconv\" for convert dds.\n\n"
 		);
 		if (DoesMeshTemplateExists() == false) GenerateGifMesh(gcnew System::String(GifMeshTemplate().c_str()));
 		return 0;
@@ -227,10 +227,10 @@ int main(int argc, char* argv[], char* const envp[])
 	for (size_t i = 1; i < argc; i++)
 	{
 		if (System::IO::Path::GetExtension(gcnew System::String(argv[i]))->ToLower() == ".gif")
-			GenerateGifAssets(argv[i], IsSpecialEdition, GameDataFolderPath, averageFrameRate, textureSize);
+			GenerateGifAssets(argv[i], IsSpecialEdition, GameDataFolderPath, averageFrameRate);
 		else print("\nFailed to convert" + string(argv[i]));
 	}
-
+	
 	print("\n\nConvert Gif Completed");
 
 	return 0;
