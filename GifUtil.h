@@ -18,6 +18,7 @@ namespace GifUtil
 	public:
 		static std::string filterColor;
 		static int OutputTextureSize;
+		static float averageFrameRate;
 	private:
 	};
 

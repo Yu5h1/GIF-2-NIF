@@ -13,6 +13,7 @@ void MsgBox(System::String^ info);
 
 void print(string content);
 void print(float val);
+void print(System::String^ info);
 
 //string print(const char * sOne, ...);
 //void MsgBox(int info);

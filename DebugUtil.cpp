@@ -14,7 +14,7 @@ void MsgBox(float info) { MsgBox(std::to_string(info)); }
 void MsgBox(System::String^ info) { MsgBox(MarshalString(info)); }
 void print(string content) { cout << content << endl; };
 void print(float val) { print(to_string(val)); };
-
+void print(System::String^ info) { print(MarshalString(info)); }
 //void MsgBox(int number) { print(to_string(number)); }
 
 //string print(const char *sOne, ...)

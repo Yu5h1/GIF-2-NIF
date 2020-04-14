@@ -13,8 +13,9 @@
 using namespace std;
 std::string GifUtil::GifConvertInfo::filterColor = "";
 int GifUtil::GifConvertInfo::OutputTextureSize = 1024;
+float GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
+
 extern float MaxMeshSize = 50;
-extern float averageFrameRate = 0.1f;
 
 string GifMeshTemplate() { return (getAppFolder() + "\\GifMeshTemplate.nif"); }
 bool DoesMeshTemplateExists() {
@@ -73,7 +74,8 @@ void GenerateGifAssets(std::string gifImagePath, bool IsSpecialEdition = false,
 	int gifWidth, gifHeight;
 
 	System::String^ outputPng = gcnew System::String((TextureOutputFolder + "\\" + gifName + ".png").c_str());
-	int spriteDimension = 0;
+
+	int spriteDimension;
 
 	vector<float> gifKeysTimes = GifUtil::ConvertToSpriteSheets(gcnew System::String(gifImagePath.c_str()), 1,
 		gifWidth, gifHeight, timeLength, outputPng, spriteDimension);
@@ -121,18 +123,7 @@ void GenerateGifAssets(std::string gifImagePath, bool IsSpecialEdition = false,
 		geomData->vertices[2] = Vector3(halfWidth, 0, -halfHeight);
 		geomData->vertices[3] = Vector3(-halfWidth, 0, -halfHeight);
 
-		int frameCount = spriteDimension * spriteDimension;
-
-		vector<float> keyFrames;
-		keyFrames.push_back(0);
-		if (timeLength == 0) {
-			for (size_t i = 0; i < frameCount; i++) keyFrames.push_back(averageFrameRate);
-		}
-		else
-		{
-			for (size_t i = 0; i < gifKeysTimes.size(); i++) keyFrames.push_back(gifKeysTimes[i]);
-		}
-
+		gifKeysTimes.insert(gifKeysTimes.begin(), 0);
 
 		auto columnsController = target.GetHeader().GetBlock<BSLightingShaderPropertyFloatController>(shader->GetControllerRef());
 		auto rowsController = target.GetHeader().GetBlock<BSLightingShaderPropertyFloatController>(columnsController->GetNextControllerRef());
@@ -153,8 +144,8 @@ void GenerateGifAssets(std::string gifImagePath, bool IsSpecialEdition = false,
 			{
 				auto k = Key<float>();
 				int index = i * spriteDimension + o;
-				if (index < keyFrames.size()) {
-					accumulator += keyFrames[index];
+				if (index < gifKeysTimes.size()) {
+					accumulator += gifKeysTimes[index];
 					k.time = accumulator;
 					k.value = uvInterval * o;
 					columnsFloatData->data.AddKey(k);
@@ -194,12 +185,12 @@ int main(int argc, char* argv[], char* const envp[])
 			auto val = MarshalString(data[1]);
 			stringstream ss(val);
 			if (data[0]->ToLower() == "gamedatapath") GameDataFolderPath = val;
-			if (data[0]->ToLower() == "averageframerate") ss >> averageFrameRate;
+			if (data[0]->ToLower() == "averageframerate") ss >> GifUtil::GifConvertInfo::averageFrameRate;
 			if (data[0]->ToLower() == "texturesize") { ss >> GifUtil::GifConvertInfo::OutputTextureSize; }
 			if (data[0]->ToLower() == "maxmeshsize") ss >> MaxMeshSize;
 			if (data[0]->ToLower() == "filtercolor") GifUtil::GifConvertInfo::filterColor = val;
 		}
-		if (averageFrameRate <= 0) averageFrameRate = 0.1f;
+		if (GifUtil::GifConvertInfo::averageFrameRate <= 0) GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
 	}
 	else {
 		System::IO::File::WriteAllText(config, gcnew System::String(
