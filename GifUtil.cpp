@@ -5,8 +5,25 @@
 
 namespace GifUtil
 {
-	void SetBlackPixelToAlpha(Bitmap^ map)
-	{
+	public class ColorInt {
+
+	public:
+		ColorInt(int r, int g, int b, int a)
+		{ red = r; green = g; blue = b; alpha = a; }
+		int red;
+		int green;
+		int blue;
+		int alpha;
+	};
+	int AlphaFromRGB(ColorInt* c) { return ((c->red + c->green + c->blue ) / 3); }
+	int AlphaFromPureBlack(ColorInt* c) { return (c->red + c->green + c->blue) == 0 ? 0 : 255; }
+
+	int AlphaFromGreen(ColorInt* c, ColorInt* filter) {
+		return ((c->red + c->green + c->blue) / 3);
+	}
+
+	void SetBlackPixelToAlpha(Bitmap^ map, int func(ColorInt*))
+	{		
 		System::Drawing::Rectangle rect = System::Drawing::Rectangle(0, 0, map->Width, map->Height);
 		auto bitmapData = map->LockBits(rect, ImageLockMode::ReadWrite, map->PixelFormat);
 		int BytesPerPixel = Bitmap::GetPixelFormatSize(map->PixelFormat) / 8;
@@ -23,51 +40,24 @@ namespace GifUtil
 			int CurrentLine = y * bitmapData->Stride;
 			for (int x = 0; x < WidthInBytes; x = x + BytesPerPixel)
 			{
-				
 				int b = Pixels[CurrentLine + x ];
 				int g = Pixels[CurrentLine + x + 1 ];
 				int r = Pixels[CurrentLine + x + 2 ];
 				int a = Pixels[CurrentLine + x + 3 ];
-				
-				// Transform blue and clip to 255:
-				Pixels[CurrentLine + x] = (byte)b;
-				// Transform green and clip to 255:
-				Pixels[CurrentLine + x + 1] = (byte)g;
-				// Transform red and clip to 255:
-				Pixels[CurrentLine + x + 2] = (byte)r;
-				// Alpha:
-				Pixels[CurrentLine + x + 3] = (byte)((b + g + r) / 3);
-				
+				Pixels[CurrentLine + x + 3] = (byte)func(new ColorInt(r,g,b,255));
 			}
-			
 			System::Console::Write("\r Calculate alpha...{0}%   ", (y / (float)HeightInPixels) * 100);
 		}											
-		//// Copy modified bytes back:
 		System::Runtime::InteropServices::Marshal::Copy(Pixels, 0, PtrFirstPixel, Pixels->Length);
 		map->UnlockBits(bitmapData);
 	}
-
-	//void SetBlackPixelToAlpha(Bitmap^ map)
-	//{		
-	//	for (int x = 0; x < map->Width; x++)
-	//	{
-	//		for (int y = 0; y < map->Height; y++)
-	//		{
-	//			Color pixel = map->GetPixel(x, y);
-	//			pixel = Color::FromArgb(((pixel.R + pixel.G + pixel.B) / 3), pixel.R, pixel.G, pixel.B);
-	//			map->SetPixel(x, y, pixel);
-	//		}
-	//		System::Console::Write("\r ErasPixel...{0}%", (x / (float)map->Width) * 100);
-	//	}
-	//}
-
 	std::vector<float> ConvertToSpriteSheets(System::String^ sourcePath,
 		int splitValue, int& width, int& height, float& timeLength,
-		System::String^& outputPath, int& spriteDimension)
+		System::String^& outputPath, int& spriteDimension, int& resultTextureSize)
 	{
 		System::String^ targetName = System::IO::Path::GetFileName(sourcePath);
 		Image^ gifImg = Image::FromFile(sourcePath);
-		
+
 		FrameDimension^ dimension = gcnew FrameDimension(gifImg->FrameDimensionsList[0]);
 		int frameCount = gifImg->GetFrameCount(dimension);
 		
@@ -100,24 +90,32 @@ namespace GifUtil
 			}
 			spriteDimension = (int)(System::Math::Ceiling(System::Math::Sqrt(frameCountPerSplit)));
 
+			resultTextureSize = GifUtil::GifConvertInfo::OutputTextureSize;
+			if (GifUtil::GifConvertInfo::TextureSizeByDimension) {
+				int powof2 = System::Math::Log(resultTextureSize, 2)+ spriteDimension;
+				powof2 = powof2 <= 13 ? powof2 : 13;
+				resultTextureSize = System::Math::Pow(2, powof2);
+			}
 
-			int frameSize = GifUtil::GifConvertInfo::OutputTextureSize / spriteDimension;
+			int frameSize = resultTextureSize / spriteDimension;
 			float diff = gifImg->Width < gifImg->Height ? (float)gifImg->Width / frameSize : (float)gifImg->Height / frameSize;
 
 			int frameWidth = gifImg->Width / diff;
 			int frameHeight = gifImg->Height / diff;
 
-	/*		int extend = 0;
-			int halfextend = extend / 2;
+			int extend = GifUtil::GifConvertInfo::FrameSizeExtend;
+			int halfextend = extend == 0 ? 0 : extend / 2;
 
-			if (extend < 2) {
+			if (frameWidth + extend < 0 || frameHeight + extend < 0){
 				extend = 0;
-				halfextend = 0; 
-			}*/
+				halfextend = 0;
+				print("Extend Size out of range");
+			}
 
-			int finalWidth = spriteDimension * frameWidth;
-			int finalHeight = spriteDimension * frameHeight;
-
+			int finalWidth = spriteDimension * (frameWidth + extend);
+			int finalHeight = spriteDimension * (frameHeight + extend);
+			
+			
 			Bitmap^ finalSprite = gcnew Bitmap(finalWidth, finalHeight);
 			
 			try
@@ -135,7 +133,7 @@ namespace GifUtil
 						Bitmap^ frame = gcnew Bitmap(gifImg, frameWidth, frameHeight);
 						try
 						{
-							canvas->DrawImage(frame, col * frameWidth , row * frameHeight);
+							canvas->DrawImage(frame, col * (frameWidth + extend) + halfextend, row * (frameHeight + extend) + halfextend);
 						}
 						finally{ delete frame; }
 						System::Console::Write("\r" + targetName + "...{0}%   ", (i / (float)frameCountPerSplit) * 100);
@@ -144,7 +142,10 @@ namespace GifUtil
 					if (outputPath == System::String::Empty)
 						outputPath = sourcePath->Substring(0, sourcePath->ToCharArray()->Length - 4) + ".png";
 					
-					if (GifUtil::GifConvertInfo::filterColor == "black") { SetBlackPixelToAlpha(finalSprite); }
+					auto filterColor = GifUtil::GifConvertInfo::filterColor;
+
+					if (filterColor == "black") { SetBlackPixelToAlpha(finalSprite,AlphaFromRGB); }
+					if (filterColor == "pureblack") { SetBlackPixelToAlpha(finalSprite, AlphaFromPureBlack); }
 
 					finalSprite->Save(outputPath, ImageFormat::Png);
 				}

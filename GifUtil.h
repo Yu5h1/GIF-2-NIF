@@ -18,11 +18,13 @@ namespace GifUtil
 	public:
 		static std::string filterColor;
 		static int OutputTextureSize;
+		static bool TextureSizeByDimension;
 		static float averageFrameRate;
+		static int FrameSizeExtend;
 	private:
 	};
 
 	std::vector<float> ConvertToSpriteSheets(System::String ^ sourcePath,
 		int splitValue, int & width, int & height, float & timeLength,
-		System::String^& outputPath, int& spriteDimension);
+		System::String^& outputPath, int& spriteDimension,int& resultTextureSize);
 }
