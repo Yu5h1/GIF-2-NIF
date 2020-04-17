@@ -11,11 +11,20 @@
 #include <Resources.h>
 
 using namespace std;
-std::string GifUtil::GifConvertInfo::filterColor = "";
+
+std::string GifUtil::GifConvertInfo::filterColor = ";black , pureblack";
 int GifUtil::GifConvertInfo::OutputTextureSize = 1024;
 int GifUtil::GifConvertInfo::FrameSizeExtend = 0;
 float GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
 bool GifUtil::GifConvertInfo::TextureSizeByDimension = false;
+
+string nameSet = "";
+bool IsSpecialEdition = false;
+string outputFolderPath = "";
+float MaxMeshSize = 50;
+bool FlipU = false;
+bool OverwriteNameSet = false;
+
 
 string GifMeshTemplate() { return (getAppFolder() + "\\GifMeshTemplate.nif"); }
 
@@ -26,8 +35,7 @@ bool DoesMeshTemplateExists() {
 System::String^ ToString_clr(string txt) { return gcnew System::String(txt.c_str()); }
 
 
-void GenerateGifAssets(string outputFolder, std::string sourceGif, string replaceName,
-	bool IsSpecialEdition, float MaxMeshSize, bool FlipU)
+void GenerateGifAssets(string outputFolder, std::string sourceGif, string replaceName)
 {
 	bool useGameFolder = outputFolder != "";
 	if (System::IO::File::Exists(gcnew System::String(sourceGif.c_str())) == false) {
@@ -111,6 +119,7 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 	float uvInterval = 1.0f / spriteDimension;
 	for (auto &refShape : target.GetShapes()) {
 		
+		auto parent = target.GetParentNode(refShape);
 
 		NiShader* shader = target.GetShader(refShape);
 
@@ -118,6 +127,8 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		target.SetTextureSlot(shader, gifdds, 0);//Set texture
 
 		auto geomData = target.GetHeader().GetBlock<NiGeometryData>(refShape->GetDataRef());
+
+		if (parent->GetBlockName() == "NiBillboardNode") FlipU = !FlipU;
 
 		float Ul = FlipU ? uvInterval : 0;
 		float Ur = FlipU ? 0 : uvInterval;
@@ -181,18 +192,29 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		ConvertFileByVersion(nifoutput.c_str(), "SE");
 	}
 }
+System::String^ SetValue(System::String^ itemName,System::String^ val) { return itemName + "=" + val + "\n"; }
+System::String^ SetValue(System::String^ itemName,int val) { return SetValue(itemName, val.ToString()); }
+System::String^ SetValue(System::String^ itemName, float val) { return SetValue(itemName, val.ToString()); }
+System::String^ SetValue(System::String^ itemName, std::string val) { return SetValue(itemName, ToString_clr(val)); }
+
+void CreateConfig(System::String^ path) {
+	System::IO::File::WriteAllText(path, gcnew System::String(
+		SetValue("GameDataPath", outputFolderPath) +
+		SetValue("averageFrameRate", GifUtil::GifConvertInfo::averageFrameRate) +
+		SetValue("TextureSize", GifUtil::GifConvertInfo::OutputTextureSize) +
+		SetValue("maxMeshSize", MaxMeshSize) +
+		SetValue("FilterColor", GifUtil::GifConvertInfo::filterColor) +
+		SetValue("FlipU", FlipU) +
+		SetValue("NameSet", nameSet) +
+		SetValue("OverwriteNameSet", OverwriteNameSet)
+		//"FrameSizeExtend=0"
+	));
+}
 
 int main(int argc, char* argv[], char* const envp[])
 {
-	string nameSet = "";
-	bool IsSpecialEdition = false;
-	string outputFolderPath = "";
-	float MaxMeshSize = 50;
-	bool FlipU = false;
-	bool OverwriteNameSet = false;
 
-
-	auto appName = System::IO::Path::GetFileNameWithoutExtension(ToString_clr(getAppPath().c_str()));
+	auto appName = System::IO::Path::GetFileNameWithoutExtension(ToString_clr(getAppPath()));
 	auto config = gcnew System::String(getAppFolder().c_str()) + "\\" + appName + ".config";
 	if (System::IO::File::Exists(config)) {
 		auto lines = System::IO::File::ReadAllLines(config);
@@ -202,37 +224,27 @@ int main(int argc, char* argv[], char* const envp[])
 			if (data->Length > 1) {
 				auto item = data[0]->ToLower();
 				auto stringVal = data[1]->Split(';')[0]->ToLower();
+				auto NoSpaceValue = MarshalString(stringVal->Replace(" ", "")->Replace("\t",""));
 				auto val = MarshalString(stringVal);
-				bool boolVal = val == "true" || val == "1";
+				bool boolVal = NoSpaceValue == "true" || NoSpaceValue == "1";
 				stringstream ss(val);
-				if (item == "gamedatapath") outputFolderPath = val;
+				if (item == "gamedatapath") outputFolderPath = MarshalString(data[1]->Split(';')[0]);
 				if (item == "averageframerate") ss >> GifUtil::GifConvertInfo::averageFrameRate;
 				if (item == "texturesize") ss >> GifUtil::GifConvertInfo::OutputTextureSize;
 				if (item == "maxmeshsize") ss >> MaxMeshSize;
-				if (item == "filtercolor") GifUtil::GifConvertInfo::filterColor = val;
+				if (item == "filtercolor") GifUtil::GifConvertInfo::filterColor = NoSpaceValue;
 				if (item == "nameset") nameSet = val;
 				if (item == "overwritenameset") OverwriteNameSet = boolVal;
 				if (item == "flipu") FlipU = boolVal;
-				/*if (item == "framesizeextend") System::Int32::TryParse(stringVal, GifUtil::GifConvertInfo::FrameSizeExtend);*/
-				if (item == "framesizeextend") ss >> GifUtil::GifConvertInfo::FrameSizeExtend;
+				//if (item == "framesizeextend") ss >> GifUtil::GifConvertInfo::FrameSizeExtend;
 			}
 		}
 		if (GifUtil::GifConvertInfo::averageFrameRate <= 0) GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
-	}
-	else {
-		System::IO::File::WriteAllText(config, gcnew System::String(
-			"GameDataPath=\n" +
-			"averageFrameRate=0.1f\n" +
-			"TextureSize=1024\n" +
-			"maxMeshSize=50\n" +
-			"FilterColor=black\n" +
-			"FlipU=false\n" +
-			"NameSet=\n" +
-			"OverwriteNameSet=false\n" +
-			"FrameSizeExtend=0"
-		));
-	}
+	}else { CreateConfig(config); }
+
 	if (argc == 1) {
+		CreateConfig(config);
+
 		MsgBox("Welecom to use Skyrim Gif " +
 			string(IsSpecialEdition ? "SpecialEdition (SE)" : "Legendary Edition (LE)") +
 			"\n\nUsage:\n" +
@@ -259,8 +271,7 @@ int main(int argc, char* argv[], char* const envp[])
 					curReplaceName += MarshalString(num.ToString("00"));
 				}
 			}
-			GenerateGifAssets(outputFolderPath, argv[i], curReplaceName, IsSpecialEdition,
-				MaxMeshSize, FlipU);
+			GenerateGifAssets(outputFolderPath, argv[i], curReplaceName);
 		}
 		else print("\nFailed to convert" + string(argv[i]));
 	}
