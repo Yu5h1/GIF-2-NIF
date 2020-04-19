@@ -142,7 +142,7 @@ namespace GifUtil
 					if (outputPath == System::String::Empty)
 						outputPath = sourcePath->Substring(0, sourcePath->ToCharArray()->Length - 4) + ".png";
 					
-					auto filterColor = GifUtil::GifConvertInfo::filterColor;
+					auto filterColor = (gcnew System::String(GifUtil::GifConvertInfo::filterColor.c_str()))->ToLower();
 
 					if (filterColor == "black") { SetBlackPixelToAlpha(finalSprite,AlphaFromRGB); }
 					if (filterColor == "pureblack") { SetBlackPixelToAlpha(finalSprite, AlphaFromPureBlack); }

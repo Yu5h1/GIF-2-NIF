@@ -12,15 +12,16 @@
 
 using namespace std;
 
-std::string GifUtil::GifConvertInfo::filterColor = ";black , pureblack";
+std::string GifUtil::GifConvertInfo::filterColor = "";
 int GifUtil::GifConvertInfo::OutputTextureSize = 1024;
 int GifUtil::GifConvertInfo::FrameSizeExtend = 0;
 float GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
 bool GifUtil::GifConvertInfo::TextureSizeByDimension = false;
 
 string nameSet = "";
-bool IsSpecialEdition = false;
+bool IsSpecialEdition = true;
 string outputFolderPath = "";
+string texconvFormatArg = IsSpecialEdition ? "BC7_UNORM":"BC1_UNORM";
 float MaxMeshSize = 50;
 bool FlipU = false;
 bool OverwriteNameSet = false;
@@ -69,7 +70,7 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 	System::String^ MeshTemplatePath = gcnew System::String(GifMeshTemplate().c_str());
 
 	string nifoutput = MeshOutputFolder + "\\" + gifName + ".nif";
-	System::String^ outputPng = gcnew System::String((TextureOutputFolder + "\\" + gifName + ".png").c_str());
+	auto outputPng = ToString_clr(TextureOutputFolder + "\\" + gifName + ".png");
 
 	NifFile target;
 
@@ -94,12 +95,16 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 	if (spriteDimension < 2) return;
 	if (System::IO::File::Exists(outputPng)) {
 		auto texconv = gcnew System::String((appFolder + "\\texconv.exe").c_str());
-		System::String^ textureSizeString = resultTextureSize.ToString();
+		string textureSizeString = to_string(resultTextureSize);
 		if (System::IO::File::Exists(texconv)) {
 			Process^ convertddsProcess = gcnew Process();
 			convertddsProcess->StartInfo->FileName = texconv;
-			convertddsProcess->StartInfo->Arguments = " -o \"" + gcnew System::String(TextureOutputFolder.c_str()) + "\" -y -w " + textureSizeString + " -h " + textureSizeString + " -f BC1_UNORM " +
-				"\"" + outputPng + "\"";
+			convertddsProcess->StartInfo->Arguments = " -o \"" + ToString_clr(
+				TextureOutputFolder +
+				+"\" -y -w " + textureSizeString + " -h " +
+				textureSizeString + " -f "+ texconvFormatArg +" \"" + MarshalString(outputPng) + "\""
+			);
+
 			convertddsProcess->Start();
 			convertddsProcess->WaitForExit();
 			System::IO::File::Delete(outputPng);
@@ -192,10 +197,31 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		ConvertFileByVersion(nifoutput.c_str(), "SE");
 	}
 }
-System::String^ SetValue(System::String^ itemName,System::String^ val) { return itemName + "=" + val + "\n"; }
-System::String^ SetValue(System::String^ itemName,int val) { return SetValue(itemName, val.ToString()); }
-System::String^ SetValue(System::String^ itemName, float val) { return SetValue(itemName, val.ToString()); }
-System::String^ SetValue(System::String^ itemName, std::string val) { return SetValue(itemName, ToString_clr(val)); }
+System::String^ GetlegalFileName(System::String^ filename) {
+	auto illeagalChar = (gcnew System::String("\\/*:?\"<>|"))->ToCharArray();
+	for (int i = 0; i < illeagalChar->Length; i++)
+	{		
+		filename = filename->Replace(illeagalChar[i].ToString(), "");
+	}
+	filename = filename->Replace("|", "");
+	while (filename->StartsWith("\t") || filename->StartsWith(" "))
+	{
+		filename = filename->Remove(0, 1);
+	}
+	while (filename->EndsWith("\t") || filename->EndsWith(" "))
+	{
+		filename = filename->Remove(filename->ToCharArray()->Length-1, 1);
+	}	
+	return filename;
+}
+
+System::String^ SetValue(System::String^ itemName,System::String^ val , System::String^ comment = "") {
+	if (comment != System::String::Empty) comment = "\t--" + comment;
+	return itemName + "=" + val + comment + "\n";
+}
+System::String^ SetValue(System::String^ itemName,int val, System::String^ comment = "") { return SetValue(itemName, val.ToString(), comment); }
+System::String^ SetValue(System::String^ itemName, float val, System::String^ comment = "") { return SetValue(itemName, val.ToString(), comment); }
+System::String^ SetValue(System::String^ itemName, std::string val, System::String^ comment = "") { return SetValue(itemName, ToString_clr(val), comment); }
 
 void CreateConfig(System::String^ path) {
 	System::IO::File::WriteAllText(path, gcnew System::String(
@@ -203,17 +229,17 @@ void CreateConfig(System::String^ path) {
 		SetValue("averageFrameRate", GifUtil::GifConvertInfo::averageFrameRate) +
 		SetValue("TextureSize", GifUtil::GifConvertInfo::OutputTextureSize) +
 		SetValue("maxMeshSize", MaxMeshSize) +
-		SetValue("FilterColor", GifUtil::GifConvertInfo::filterColor) +
+		SetValue("FilterColor", GifUtil::GifConvertInfo::filterColor, "black , pureblack") +
 		SetValue("FlipU", FlipU) +
 		SetValue("NameSet", nameSet) +
-		SetValue("OverwriteNameSet", OverwriteNameSet)
+		SetValue("OverwriteNameSet", OverwriteNameSet) +
+		SetValue("TexconvFormatArg", texconvFormatArg)
 		//"FrameSizeExtend=0"
 	));
 }
 
 int main(int argc, char* argv[], char* const envp[])
 {
-
 	auto appName = System::IO::Path::GetFileNameWithoutExtension(ToString_clr(getAppPath()));
 	auto config = gcnew System::String(getAppFolder().c_str()) + "\\" + appName + ".config";
 	if (System::IO::File::Exists(config)) {
@@ -222,22 +248,26 @@ int main(int argc, char* argv[], char* const envp[])
 		{
 			auto data = lines[i]->Split('=');
 			if (data->Length > 1) {
-				auto item = data[0]->ToLower();
-				auto stringVal = data[1]->Split(';')[0]->ToLower();
-				auto NoSpaceValue = MarshalString(stringVal->Replace(" ", "")->Replace("\t",""));
-				auto val = MarshalString(stringVal);
-				bool boolVal = NoSpaceValue == "true" || NoSpaceValue == "1";
+				auto item = data[0]->ToLower();		
+				auto stringVal = data[1]->Split(';','-')[0];
+				auto NoSpaceValue = stringVal->Split(' ', '\t')[0];
+				auto mStringVal = MarshalString(stringVal);
+
+				auto val = MarshalString(NoSpaceValue);
+				bool boolVal = val == "true" || val == "1";
 				stringstream ss(val);
-				if (item == "gamedatapath") outputFolderPath = MarshalString(data[1]->Split(';')[0]);
+				if (item == "gamedatapath") outputFolderPath = mStringVal;
 				if (item == "averageframerate") ss >> GifUtil::GifConvertInfo::averageFrameRate;
 				if (item == "texturesize") ss >> GifUtil::GifConvertInfo::OutputTextureSize;
 				if (item == "maxmeshsize") ss >> MaxMeshSize;
-				if (item == "filtercolor") GifUtil::GifConvertInfo::filterColor = NoSpaceValue;
-				if (item == "nameset") nameSet = val;
+				if (item == "filtercolor") GifUtil::GifConvertInfo::filterColor = val;
+				if (item == "nameset") nameSet = MarshalString(GetlegalFileName(stringVal));
 				if (item == "overwritenameset") OverwriteNameSet = boolVal;
 				if (item == "flipu") FlipU = boolVal;
+				if (item == "texconvformatarg") texconvFormatArg = val;
 				//if (item == "framesizeextend") ss >> GifUtil::GifConvertInfo::FrameSizeExtend;
 			}
+			
 		}
 		if (GifUtil::GifConvertInfo::averageFrameRate <= 0) GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
 	}else { CreateConfig(config); }
