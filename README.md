@@ -1,13 +1,8 @@
 # GIF-2-NIF
-Convert GIF to NIF
+A tool to convert GIF to NIF for TESV Skyrim
 
+Libraries used:
+  ousnius's NIFLib
 
-## License
-[GPLv3](https://github.com/Yu5h1/GIF-2-NIF/blob/master/LICENSE.txt)
-
-
-## Thanks
-
-NifTools team
-
-Visual Studio Community
+IDE used:
+  Visual Studio Community
