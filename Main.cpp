@@ -8,9 +8,10 @@
 #include <DebugUtil.h>
 #include <PathUtil.h>
 #include <NifVersionConverter.h>
-#include <Resources.h>
 
 using namespace std;
+
+System::String^ ToString_clr(string txt) { return gcnew System::String(txt.c_str()); }
 
 std::string GifUtil::GifConvertInfo::filterColor = "";
 int GifUtil::GifConvertInfo::OutputTextureSize = 1024;
@@ -18,22 +19,28 @@ int GifUtil::GifConvertInfo::FrameSizeExtend = 0;
 float GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
 bool GifUtil::GifConvertInfo::TextureSizeByDimension = false;
 
+string appFolder = getAppFolder();
 string nameSet = "";
-bool IsSpecialEdition = true;
+bool IsSpecialEdition = false;
 string outputFolderPath = "";
-string texconvFormatArg = IsSpecialEdition ? "BC7_UNORM":"BC1_UNORM";
 float MaxMeshSize = 50;
 bool FlipU = false;
 bool OverwriteNameSet = false;
+string texconvFormatArg = IsSpecialEdition ? "BC7_UNORM" : "BC1_UNORM";
+string texconv = appFolder + "\\texconv.exe";
 
+bool DoesTexconvExists = System::IO::File::Exists(ToString_clr(texconv));
 
-string GifMeshTemplate() { return (getAppFolder() + "\\GifMeshTemplate.nif"); }
+string GifMeshTemplate() { return appFolder + "\\GifMeshTemplate.nif"; }
+
+void GenerateGifMesh(System::String^ path) {
+	System::IO::File::WriteAllBytes(path, System::Convert::FromBase64String("R2FtZWJyeW8gRmlsZSBGb3JtYXQsIFZlcnNpb24gMjAuMi4wLjcKBwACFAEMAAAADQAAAFMAAAABAClPcHRpbWl6ZWQgd2l0aCBTU0UgTklGIE9wdGltaXplciB2My4wLjcuAAEACgAKAAAAQlNGYWRlTm9kZQoAAABOaVRyaVNoYXBlDwAAAE5pQWxwaGFQcm9wZXJ0eQ4AAABOaVRyaVNoYXBlRGF0YRgAAABCU0xpZ2h0aW5nU2hhZGVyUHJvcGVydHknAAAAQlNMaWdodGluZ1NoYWRlclByb3BlcnR5RmxvYXRDb250cm9sbGVyEwAAAE5pRmxvYXRJbnRlcnBvbGF0b3ILAAAATmlGbG9hdERhdGESAAAAQlNTaGFkZXJUZXh0dXJlU2V0CAAAAEJTWEZsYWdzAAABAAIAAwAEAAUABgAHAAcACAAFAAYACQBYAAAAYQAAAA8AAAAcAQAAZAAAACIAAAAIAAAAMAAAADAAAAAoAAAAIgAAAAgAAAAIAAAAAwAAAAcAAAAHAAAAZ2lmTm9kZQcAAABnaWZNZXNoAwAAAEJTWAAAAAAAAAAAAQAAAAwAAAD/////AAAIAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAgD//////AQAAAAEAAAAAAAAAAQAAAAAAAAD/////DgAIAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAgD//////AwAAAP////8AAAAAAAAAAAAEAAAAAgAAAP////8AAAAA/////+wSgAAAAAAEAAAAAVq14sEAAAAAyGEiQlm14kEAAAAAymEiQgR340EAAAAAkAkAQQN348EAAAAAdhEAQQEQAAAAAAHQ3qQ0AACAP4hdjrOqFp40AACAP9SdvbPQ3qQ0AACAP4hdjrNMoas0AACAP4CJPrMh+Dq8jtSGs7z7f7+nMaO8T/uws//yf78h+Dq8jtSGs7z7f7/uJT67c406s7r/f7+8+3+/C0SlNCL4Ojz+8n+/YwCfNKcxozy8+3+/C0SlNCL4Ojy6/3+/zrKrNPAlPjsAgBE6RE5EP3q9wUHt7AJCAAAAgD4AAAAAAAAAAAAAAAAAAAAAAACAPgAAgD4AAIA+AAD/////AgAGAAAAAQAAAQACAAIAAwAAAAAAAgAAAP////8AAAAABQAAAAEDQILRgAAAAAAAAAAAAAAAAIA/AACAPwkAAAAAAIA/AACAPwAAgD8AAIA/AwAAAAAAgD8AAAAAAABIQgAAgD8AAIA/AACAPwAAAD+amZk+AAAAQAoAAAAIAAAAgD8AAAAAAAAAAI/C9T0EAAAABgAAABQAAAAAAAAACAAAAAUAAAAFAAAAAAAAAAAAAACPwvU9AACAPo/CdT4AAAA/7FG4PgAAQD+PwvU+AACAPwUAAAAFAAAAAAAAAAAAAACPwvU8AACAPo/CdT0AAAA/7FG4PQAAQD+PwvU9AACAPwkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////CAAAAIA/AAAAAAAAAACPwvU+BAAAAAsAAAAWAAAA//9//wcAAAACAAAACwAAAAEAAAAAAAAA"));
+}
 
 bool DoesMeshTemplateExists() {
 	return System::IO::File::Exists(gcnew System::String(GifMeshTemplate().c_str()));
 }
 
-System::String^ ToString_clr(string txt) { return gcnew System::String(txt.c_str()); }
 
 
 void GenerateGifAssets(string outputFolder, std::string sourceGif, string replaceName)
@@ -44,7 +51,6 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		return;
 	}
 
-	string appFolder = getAppFolder();
 	string gifName = replaceName == "" ? GetFileNameWithoutExtension(sourceGif) : replaceName;
 
 	System::String^ GameDataFolder = gcnew System::String(outputFolder.c_str());
@@ -82,8 +88,6 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		target.Load(nifoutput);
 	}
 
-	//target.SetNodeName(0, gifName.c_str());
-
 	float timeLength = 0;
 	int gifWidth, gifHeight;
 
@@ -92,13 +96,14 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 	vector<float> gifKeysTimes = GifUtil::ConvertToSpriteSheets(gcnew System::String(sourceGif.c_str()), 1,
 		gifWidth, gifHeight, timeLength, outputPng, spriteDimension, resultTextureSize);
 
+	string TextureSlotValue = textureGifDir + "\\" + gifName ;
+
 	if (spriteDimension < 2) return;
 	if (System::IO::File::Exists(outputPng)) {
-		auto texconv = gcnew System::String((appFolder + "\\texconv.exe").c_str());
 		string textureSizeString = to_string(resultTextureSize);
-		if (System::IO::File::Exists(texconv)) {
+		if (DoesTexconvExists) {
 			Process^ convertddsProcess = gcnew Process();
-			convertddsProcess->StartInfo->FileName = texconv;
+			convertddsProcess->StartInfo->FileName = ToString_clr(texconv);
 			convertddsProcess->StartInfo->Arguments = " -o \"" + ToString_clr(
 				TextureOutputFolder +
 				+"\" -y -w " + textureSizeString + " -h " +
@@ -108,11 +113,12 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 			convertddsProcess->Start();
 			convertddsProcess->WaitForExit();
 			System::IO::File::Delete(outputPng);
+			TextureSlotValue += ".dds";
 		}
 		else {
-			MsgBox("texconv.exe\n does not exist.\n failed convert to DDS");
+			TextureSlotValue += ".png";
 		}
-	}
+	} else return; 
 
 	float diff = (gifWidth < gifHeight ? gifHeight : gifWidth) / (MaxMeshSize < 1 ? 20 : MaxMeshSize);
 
@@ -128,8 +134,7 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 
 		NiShader* shader = target.GetShader(refShape);
 
-		string gifdds = string(textureGifDir + "\\" + gifName + ".dds");
-		target.SetTextureSlot(shader, gifdds, 0);//Set texture
+		target.SetTextureSlot(shader, TextureSlotValue, 0);//Set texture
 
 		auto geomData = target.GetHeader().GetBlock<NiGeometryData>(refShape->GetDataRef());
 
@@ -239,9 +244,10 @@ void CreateConfig(System::String^ path) {
 }
 
 int main(int argc, char* argv[], char* const envp[])
-{
+{	
 	auto appName = System::IO::Path::GetFileNameWithoutExtension(ToString_clr(getAppPath()));
-	auto config = gcnew System::String(getAppFolder().c_str()) + "\\" + appName + ".config";
+	auto config = gcnew System::String(appFolder.c_str()) + "\\" + appName + ".config";	
+
 	if (System::IO::File::Exists(config)) {
 		auto lines = System::IO::File::ReadAllLines(config);
 		for (int i = 0; i < lines->Length; i++)
@@ -287,7 +293,7 @@ int main(int argc, char* argv[], char* const envp[])
 	int LastNum = 0;
 	if (nameSet != "" && !OverwriteNameSet) {
 		auto outputPath = System::IO::Directory::Exists(ToString_clr(outputFolderPath)) ?
-			outputFolderPath : getAppFolder();
+			outputFolderPath : appFolder;
 		LastNum = System::IO::Directory::GetFiles(ToString_clr(outputPath), ToString_clr(nameSet + "*.nif"))->Length;
 	}
 	for (size_t i = 1; i < argc; i++)
