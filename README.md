@@ -1,5 +1,5 @@
 # GIF-2-NIF
-A tool to convert GIF to NIF for TESV Skyrim
+A console application to convert GIF to NIF for TESV Skyrim
 
 **Libraries used:**
 
