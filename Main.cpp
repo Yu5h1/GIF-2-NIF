@@ -143,6 +143,7 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		float Ul = FlipU ? uvInterval : 0;
 		float Ur = FlipU ? 0 : uvInterval;
 
+		
 		geomData->uvSets[0][0] = Vector2(Ur, 0);
 		geomData->uvSets[0][1] = Vector2(Ul, 0);
 		geomData->uvSets[0][2] = Vector2(Ul, uvInterval);
@@ -247,6 +248,10 @@ int main(int argc, char* argv[], char* const envp[])
 {	
 	auto appName = System::IO::Path::GetFileNameWithoutExtension(ToString_clr(getAppPath()));
 	auto config = gcnew System::String(appFolder.c_str()) + "\\" + appName + ".config";	
+
+	if (!DoesTexconvExists) {
+		MsgBox("texconv.exe\n does not exists.\n image will convert to PNG");
+	}
 
 	if (System::IO::File::Exists(config)) {
 		auto lines = System::IO::File::ReadAllLines(config);
