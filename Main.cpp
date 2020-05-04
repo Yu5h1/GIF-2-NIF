@@ -84,8 +84,26 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		target.Load(MarshalString(MeshTemplatePath));
 	}
 	else {
-		GenerateGifMesh(gcnew System::String(nifoutput.c_str()));
+		GenerateGifMesh(ToString_clr(nifoutput.c_str()));
 		target.Load(nifoutput);
+	}
+
+	bool hasBsxflags = false;
+	auto extraDatas = target.GetRootNode()->GetExtraData();
+	if (extraDatas.GetSize() > 0) {
+		for (auto extradata : extraDatas)
+		{
+			if (target.GetHeader().GetBlockTypeStringById(extradata.GetIndex()) == "BSXFlags") {
+				hasBsxflags = true;
+				break;
+			}
+		}
+	}
+	if (!hasBsxflags) {
+		auto bsxFlags = new BSXFlags();
+		bsxFlags->SetIntegerData(11);
+		bsxFlags->SetName("BSX");
+		target.AssignExtraData(target.GetRootNode(), bsxFlags);
 	}
 
 	float timeLength = 0;
@@ -127,12 +145,13 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 
 
 
-	float uvInterval = 1.0f / spriteDimension;
+	float uvDimension = 1.0f / spriteDimension;
 	for (auto &refShape : target.GetShapes()) {
 		
 		auto parent = target.GetParentNode(refShape);
 
-		NiShader* shader = target.GetShader(refShape);
+		int shaderIndex = refShape->GetShaderPropertyRef();
+		auto shader = target.GetHeader().GetBlock<BSShaderProperty>(shaderIndex);
 
 		target.SetTextureSlot(shader, TextureSlotValue, 0);//Set texture
 
@@ -140,24 +159,69 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 
 		if (parent->GetBlockName() == "NiBillboardNode") FlipU = !FlipU;
 
-		float Ul = FlipU ? uvInterval : 0;
-		float Ur = FlipU ? 0 : uvInterval;
+		// Deprecated because of glitch
+		// shader->uvScale = Vector2(FlipU ? -uvDimension: uvDimension, uvDimension);
 
-		
-		geomData->uvSets[0][0] = Vector2(Ur, 0);
-		geomData->uvSets[0][1] = Vector2(Ul, 0);
-		geomData->uvSets[0][2] = Vector2(Ul, uvInterval);
-		geomData->uvSets[0][3] = Vector2(Ur, uvInterval);
-
-		geomData->vertices[0] = Vector3(-halfWidth, 0, halfHeight);
-		geomData->vertices[1] = Vector3(halfWidth, 0, halfHeight);
-		geomData->vertices[2] = Vector3(halfWidth, 0, -halfHeight);
-		geomData->vertices[3] = Vector3(-halfWidth, 0, -halfHeight);
+		if (geomData->vertices.size() == 4) {
+			// A square plane
+			float Ul = FlipU ? uvDimension : 0;
+			float Ur = FlipU ? 0 : uvDimension;
+			geomData->uvSets[0][0] = Vector2(Ur, 0);
+			geomData->uvSets[0][1] = Vector2(Ul, 0);
+			geomData->uvSets[0][2] = Vector2(Ul, uvDimension);
+			geomData->uvSets[0][3] = Vector2(Ur, uvDimension);
+			geomData->vertices[0] = Vector3(-halfWidth, 0, halfHeight);
+			geomData->vertices[1] = Vector3(halfWidth, 0, halfHeight);
+			geomData->vertices[2] = Vector3(halfWidth, 0, -halfHeight);
+			geomData->vertices[3] = Vector3(-halfWidth, 0, -halfHeight);
+		}else {
+			for (int i = 0; i < geomData->uvSets[0].size(); i++)
+			{
+				auto curUVvert = geomData->uvSets[0][i];
+				geomData->uvSets[0][i] = Vector2(curUVvert.u*uvDimension,curUVvert.v*uvDimension);
+			}
+		}
 
 		gifKeysTimes.insert(gifKeysTimes.begin(), 0);
 
-		auto columnsController = target.GetHeader().GetBlock<BSLightingShaderPropertyFloatController>(shader->GetControllerRef());
-		auto rowsController = target.GetHeader().GetBlock<BSLightingShaderPropertyFloatController>(columnsController->GetNextControllerRef());
+		int columnControllerIndex = shader->GetControllerRef();
+		if (columnControllerIndex < 0) {
+			auto columnController = new BSLightingShaderPropertyFloatController();
+			columnController->SetFlags(8);
+			columnController->typeOfControlledVariable = 20;
+			columnController->SetTargetRef(shaderIndex);
+			auto columnsInterpolator = new NiFloatInterpolator();
+			columnController->SetInterpolatorRef(target.GetHeader().AddBlock(columnsInterpolator));
+			auto floatdata = new NiFloatData();
+			floatdata->data.interpolation = KeyType::CONST_KEY;
+			columnsInterpolator->SetDataRef(target.GetHeader().AddBlock(floatdata));
+
+			columnControllerIndex = target.GetHeader().AddBlock(columnController);
+			shader->SetControllerRef(columnControllerIndex);
+		}
+		auto columnsController = target.GetHeader().GetBlock<BSLightingShaderPropertyFloatController>(columnControllerIndex);
+		//MsgBox(columnController);
+		
+
+		int rowControllerIndex = columnsController->GetNextControllerRef();
+		if (rowControllerIndex < 0) {
+			auto rowsController = new BSLightingShaderPropertyFloatController();
+			rowsController->typeOfControlledVariable = 22;
+			rowsController->SetFlags(8);
+			rowsController->SetTargetRef(shaderIndex);
+			auto rowsInterpolator = new NiFloatInterpolator();
+			rowsController->SetInterpolatorRef(target.GetHeader().AddBlock(rowsInterpolator));
+			auto floatdata = new NiFloatData();
+			floatdata->data.interpolation = KeyType::CONST_KEY;
+			rowsInterpolator->SetDataRef(target.GetHeader().AddBlock(floatdata));
+
+			rowControllerIndex = target.GetHeader().AddBlock(rowsController);
+			columnsController->SetNextControllerRef(rowControllerIndex);
+		}
+		auto rowsController = target.GetHeader().GetBlock<BSLightingShaderPropertyFloatController>(rowControllerIndex);
+		//MsgBox(columnsController->typeOfControlledVariable.ToString());
+		//MsgBox(rowsController->typeOfControlledVariable.ToString());
+		//return;
 
 		columnsController->startTime = 0;
 		auto columnsInterpolator = target.GetHeader().GetBlock<NiFloatInterpolator>(columnsController->GetInterpolatorRef());
@@ -178,11 +242,11 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 				if (index < gifKeysTimes.size()) {
 					accumulator += gifKeysTimes[index];
 					k.time = accumulator;
-					k.value = uvInterval * o;
+					k.value = uvDimension * o;
 					columnsFloatData->data.AddKey(k);
 					if (o == 0) {
 						auto rk = Key<float>();
-						rk.value = uvInterval * i;
+						rk.value = uvDimension * i;
 						rk.time = accumulator;
 						rowsFloatData->data.AddKey(rk);
 					}
@@ -204,7 +268,7 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 	}
 }
 System::String^ GetlegalFileName(System::String^ filename) {
-	auto illeagalChar = (gcnew System::String("\\/*:?\"<>|"))->ToCharArray();
+	auto illeagalChar = (gcnew System::String("*:?\"<>|"))->ToCharArray();
 	for (int i = 0; i < illeagalChar->Length; i++)
 	{		
 		filename = filename->Replace(illeagalChar[i].ToString(), "");
@@ -303,7 +367,8 @@ int main(int argc, char* argv[], char* const envp[])
 	}
 	for (size_t i = 1; i < argc; i++)
 	{
-		if (System::IO::Path::GetExtension(gcnew System::String(argv[i]))->ToLower() == ".gif") {
+		auto curFileType = System::IO::Path::GetExtension(ToString_clr(argv[i]))->ToLower();
+		if (curFileType == ".gif") {
 			string curReplaceName = "";
 			if (nameSet != "") {
 				int num = i - 1 + LastNum;
@@ -313,8 +378,7 @@ int main(int argc, char* argv[], char* const envp[])
 				}
 			}
 			GenerateGifAssets(outputFolderPath, argv[i], curReplaceName);
-		}
-		else print("\nFailed to convert" + string(argv[i]));
+		}else print("\nFailed to convert" + string(argv[i]));
 	}
 
 	print("\n\nConvert Gif Completed");
