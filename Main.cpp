@@ -13,6 +13,7 @@ using namespace std;
 
 System::String^ ToString_clr(string txt) { return gcnew System::String(txt.c_str()); }
 
+bool IsSpecialEdition = false;
 std::string GifUtil::GifConvertInfo::filterColor = "";
 int GifUtil::GifConvertInfo::OutputTextureSize = 1024;
 int GifUtil::GifConvertInfo::FrameSizeExtend = 0;
@@ -20,9 +21,8 @@ float GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
 bool GifUtil::GifConvertInfo::TextureSizeByDimension = false;
 
 string appFolder = getAppFolder();
-string TagOfSpecificShapeName = "";
+string TagOfSpecificShapeName = "gif";
 string nameSet = "";
-bool IsSpecialEdition = false;
 string outputFolderPath = "";
 float MaxMeshSize = 50;
 bool FlipU = false;
