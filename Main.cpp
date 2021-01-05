@@ -7,7 +7,7 @@
 #include <GifUtil.h>
 #include <DebugUtil.h>
 #include <PathUtil.h>
-#include <NifVersionConverter.h>
+#include <StringUtil.h>
 
 using namespace std;
 
@@ -22,6 +22,7 @@ bool GifUtil::GifConvertInfo::TextureSizeByDimension = false;
 
 string appFolder = getAppFolder();
 string TagOfSpecificShapeName = "gif";
+string SizeMode = "";
 string nameSet = "";
 string outputFolderPath = "";
 float MaxMeshSize = 50;
@@ -89,28 +90,33 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		GenerateGifMesh(ToString_clr(nifoutput.c_str()));
 		target.Load(nifoutput);
 	}
-
-	bool hasBsxflags = false;
+	BSXFlags* bsxFlags = nullptr;
 	auto extraDatas = target.GetRootNode()->GetExtraData();
 	if (extraDatas.GetSize() > 0) {
 		for (auto extradata : extraDatas)
 		{
+			
 			if (target.GetHeader().GetBlockTypeStringById(extradata.GetIndex()) == "BSXFlags") {
-				hasBsxflags = true;
+				bsxFlags = target.GetHeader().GetBlock<BSXFlags>(extradata.GetIndex());
 				break;
 			}
 		}
 	}
-	if (!hasBsxflags) {
-		auto bsxFlags = new BSXFlags();
-		bsxFlags->SetIntegerData(11);
-		bsxFlags->SetName("BSX");
+	if (bsxFlags == nullptr) {
+		bsxFlags = new BSXFlags();		
 		target.AssignExtraData(target.GetRootNode(), bsxFlags);
 	}
+	bsxFlags->SetIntegerData(11);
+	bsxFlags->SetName("BSX");
 
 	float timeLength = 0;
-	int gifWidth, gifHeight;
+	int gifWidth = 0, gifHeight = 0;
 
+	if (SizeMode != "" && SizeMode.length() >= 3 && StringContain(SizeMode, ":")) {
+		auto AspectRatioValues = StringSplit(SizeMode, ":");
+		gifWidth = stoi(AspectRatioValues[0]);
+		gifHeight = stoi(AspectRatioValues[1]);
+	}
 	int spriteDimension, resultTextureSize;
 
 	vector<float> gifKeysTimes = GifUtil::ConvertToSpriteSheets(gcnew System::String(sourceGif.c_str()), 1,
@@ -145,8 +151,6 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 	float halfHeight = (gifHeight / diff)*0.5f;
 	float halfWidth = (gifWidth / diff)*0.5f;
 
-
-
 	float uvDimension = 1.0f / spriteDimension;
 	for (auto &refShape : target.GetShapes()) {
 		if (TagOfSpecificShapeName != "") {
@@ -176,10 +180,12 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 			geomData->uvSets[0][1] = Vector2(Ul, 0);
 			geomData->uvSets[0][2] = Vector2(Ul, uvDimension);
 			geomData->uvSets[0][3] = Vector2(Ur, uvDimension);
-			geomData->vertices[0] = Vector3(-halfWidth, 0, halfHeight);
-			geomData->vertices[1] = Vector3(halfWidth, 0, halfHeight);
-			geomData->vertices[2] = Vector3(halfWidth, 0, -halfHeight);
-			geomData->vertices[3] = Vector3(-halfWidth, 0, -halfHeight);
+			if (SizeMode == "" || SizeMode == "default") {
+				geomData->vertices[0] = Vector3(-halfWidth, 0, halfHeight);
+				geomData->vertices[1] = Vector3(halfWidth, 0, halfHeight);
+				geomData->vertices[2] = Vector3(halfWidth, 0, -halfHeight);
+				geomData->vertices[3] = Vector3(-halfWidth, 0, -halfHeight);
+			}
 		}else {
 			for (int i = 0; i < geomData->uvSets[0].size(); i++)
 			{
@@ -194,14 +200,15 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 
 		int columnControllerIndex = shader->GetControllerRef();
 		if (columnControllerIndex < 0) {
-			auto columnController = new BSLightingShaderPropertyFloatController();
+			auto columnController = new BSLightingShaderPropertyFloatController();			
+			
 			columnController->SetFlags(8);
-			columnController->typeOfControlledVariable = 20;
+			columnController->SetTypeOfControlledVariable(20);
 			columnController->SetTargetRef(shaderIndex);
 			auto columnsInterpolator = new NiFloatInterpolator();
 			columnController->SetInterpolatorRef(target.GetHeader().AddBlock(columnsInterpolator));
 			auto floatdata = new NiFloatData();
-			floatdata->data.interpolation = KeyType::CONST_KEY;
+			floatdata->SetInterpolationType(KeyType::CONST_KEY);
 			columnsInterpolator->SetDataRef(target.GetHeader().AddBlock(floatdata));
 
 			columnControllerIndex = target.GetHeader().AddBlock(columnController);
@@ -209,18 +216,17 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		}
 		auto columnsController = target.GetHeader().GetBlock<BSLightingShaderPropertyFloatController>(columnControllerIndex);
 		//MsgBox(columnController);
-		
 
 		int rowControllerIndex = columnsController->GetNextControllerRef();
 		if (rowControllerIndex < 0) {
 			auto rowsController = new BSLightingShaderPropertyFloatController();
-			rowsController->typeOfControlledVariable = 22;
+			rowsController->SetTypeOfControlledVariable(22);
 			rowsController->SetFlags(8);
 			rowsController->SetTargetRef(shaderIndex);
 			auto rowsInterpolator = new NiFloatInterpolator();
 			rowsController->SetInterpolatorRef(target.GetHeader().AddBlock(rowsInterpolator));
 			auto floatdata = new NiFloatData();
-			floatdata->data.interpolation = KeyType::CONST_KEY;
+			floatdata->SetInterpolationType(KeyType::CONST_KEY);
 			rowsInterpolator->SetDataRef(target.GetHeader().AddBlock(floatdata));
 
 			rowControllerIndex = target.GetHeader().AddBlock(rowsController);
@@ -231,16 +237,16 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		//MsgBox(rowsController->typeOfControlledVariable.ToString());
 		//return;
 
-		columnsController->startTime = 0;
+		columnsController->SetStartTime(0);
 		auto columnsInterpolator = target.GetHeader().GetBlock<NiFloatInterpolator>(columnsController->GetInterpolatorRef());
 		auto columnsFloatData = target.GetHeader().GetBlock<NiFloatData>(columnsInterpolator->GetDataRef());
-		columnsFloatData->data.ClearKeys();
-		rowsController->startTime = 0;
+		columnsFloatData->ClearKeys();
+		rowsController->SetStartTime(0);
 		auto rowsInterpolator = target.GetHeader().GetBlock<NiFloatInterpolator>(rowsController->GetInterpolatorRef());
 		auto rowsFloatData = target.GetHeader().GetBlock<NiFloatData>(rowsInterpolator->GetDataRef());
-		rowsFloatData->data.ClearKeys();
+		rowsFloatData->ClearKeys();
 		float accumulator = 0;
-
+		
 		for (size_t i = 0; i < spriteDimension; i++)
 		{
 			for (size_t o = 0; o < spriteDimension; o++)
@@ -251,29 +257,22 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 					accumulator += gifKeysTimes[index];
 					k.time = accumulator;
 					k.value = uvDimension * o;
-					columnsFloatData->data.AddKey(k);
+					columnsFloatData->AddKey(k);
 					if (o == 0) {
 						auto rk = Key<float>();
 						rk.value = uvDimension * i;
 						rk.time = accumulator;
-						rowsFloatData->data.AddKey(rk);
+						rowsFloatData->AddKey(rk);
 					}
 				}
 			}
-		}
-
-		columnsController->stopTime = accumulator;
-		rowsController->stopTime = accumulator;
-
-
+		}		
+		columnsController->SetStopTime(accumulator);
+		rowsController->SetStopTime(accumulator);
 
 	}
 	target.PrettySortBlocks();
 	target.Save(nifoutput);
-
-	if (IsSpecialEdition) {
-		ConvertFileByVersion(nifoutput.c_str(), "SE");
-	}
 }
 System::String^ GetlegalFileName(System::String^ filename) {
 	auto illeagalChar = (gcnew System::String("*:?\"<>|"))->ToCharArray();
@@ -333,7 +332,8 @@ void CreateConfig(System::String^ path) {
 		SetValue("NameSet", MarshalString(nameprefix)+nameSet) +
 		SetValue("OverwriteNameSet", OverwriteNameSet) +
 		SetValue("TexconvFormatArg", texconvFormatArg) +
-		SetValue("TagOfSpecificShapeName", TagOfSpecificShapeName)
+		SetValue("TagOfSpecificShapeName", TagOfSpecificShapeName) +
+		SetValue("SizeMode", SizeMode)
 		
 		//"FrameSizeExtend=0"
 	));
@@ -358,24 +358,22 @@ int main(int argc, char* argv[], char* const envp[])
 				auto stringVal = data[1]->Split(';','-')[0];
 				auto MarshalTextVal = MarshalString(stringVal);
 
-
 				auto NoSpaceValue = stringVal->Split(' ', '\t')[0];
-				
 
 				auto val = MarshalString(NoSpaceValue);
 				bool boolVal = val == "true" || val == "1";
 				stringstream ss(val);
 				if (item == "gamedatapath") outputFolderPath = MarshalTextVal;
-				if (item == "averageframerate") ss >> GifUtil::GifConvertInfo::averageFrameRate;
-				if (item == "texturesize") ss >> GifUtil::GifConvertInfo::OutputTextureSize;
-				if (item == "maxmeshsize") ss >> MaxMeshSize;
-				if (item == "filtercolor") GifUtil::GifConvertInfo::filterColor = val;
-				if (item == "nameset") nameSet = MarshalString(GetlegalFileName(stringVal));
-				if (item == "overwritenameset") OverwriteNameSet = boolVal;
-				if (item == "flipu") FlipU = boolVal;
-				if (item == "tagofspecificshapename") TagOfSpecificShapeName = MarshalTextVal;
-				if (item == "texconvformatarg") texconvFormatArg = val;
-				//if (item == "framesizeextend") ss >> GifUtil::GifConvertInfo::FrameSizeExtend;
+				else if (item == "averageframerate") ss >> GifUtil::GifConvertInfo::averageFrameRate;
+				else if (item == "texturesize") ss >> GifUtil::GifConvertInfo::OutputTextureSize;
+				else if (item == "maxmeshsize") ss >> MaxMeshSize;
+				else if (item == "filtercolor") GifUtil::GifConvertInfo::filterColor = val;
+				else if (item == "nameset") nameSet = MarshalString(GetlegalFileName(stringVal));
+				else if (item == "overwritenameset") OverwriteNameSet = boolVal;
+				else if (item == "flipu") FlipU = boolVal;
+				else if (item == "tagofspecificshapename") TagOfSpecificShapeName = MarshalTextVal;
+				else if (item == "texconvformatarg") texconvFormatArg = val;
+				else if (item == "sizemode") { SizeMode = val; }
 			}
 			
 		}
@@ -408,11 +406,8 @@ int main(int argc, char* argv[], char* const envp[])
 		if (curFileType == ".gif") {
 			string curReplaceName = "";
 			if (nameSet != "") {
-				int num = i - 1 + LastNum;
-				curReplaceName = nameSet;
-				if (num > 0) {
-					curReplaceName += MarshalString(num.ToString("00"));
-				}
+				int num = i + LastNum;
+				curReplaceName = nameSet + MarshalString(num.ToString("00"));
 			}
 			GenerateGifAssets(outputFolderPath, argv[i], curReplaceName);
 		}else print("\nFailed to convert" + string(argv[i]));

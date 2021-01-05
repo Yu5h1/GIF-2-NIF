@@ -5,6 +5,97 @@
 
 namespace GifUtil
 {
+	Bitmap^ Cut(Bitmap^ bitmap, System::Drawing::Rectangle rect)
+	{
+		Bitmap^ result = nullptr;
+		auto mapRect = gcnew System::Drawing::Rectangle(0, 0, bitmap->Width, bitmap->Height);
+		if (mapRect->IntersectsWith(rect) || rect.Contains(*mapRect))
+		{
+			int maxWidth = rect.X + rect.Width;
+			int maxHeight = rect.Y + rect.Height;
+			if (maxWidth > bitmap->Width || maxHeight > bitmap->Height ||
+				rect.X < 0 || rect.Y < 0)
+			{
+				auto imgoffset = gcnew Point(0, 0);
+				auto SafeRect = rect;
+				if (SafeRect.X < 0)
+				{
+					imgoffset->X = System::Math::Abs(rect.X);
+					SafeRect.Width = SafeRect.Width + SafeRect.X;
+					SafeRect.X = 0;
+
+				}
+				if (SafeRect.Width + SafeRect.X > bitmap->Width)
+				{
+					SafeRect.Width = bitmap->Width - SafeRect.X;
+				}
+				if (SafeRect.Y < 0)
+				{
+					imgoffset->Y = System::Math::Abs(rect.Y);
+					SafeRect.Height = SafeRect.Height + SafeRect.Y;
+					SafeRect.Y = 0;
+				}
+				if (SafeRect.Height + SafeRect.Y > bitmap->Height)
+				{
+					SafeRect.Height = bitmap->Height - SafeRect.Y;
+				}
+				auto intersectionMap = bitmap->Clone(SafeRect, bitmap->PixelFormat);
+
+				result = gcnew Bitmap(rect.Width, rect.Height);
+				auto canvas = Graphics::FromImage(result);
+				try 
+				{
+					canvas->InterpolationMode = Drawing2D::InterpolationMode::HighQualityBicubic;
+					canvas->DrawImage(intersectionMap, imgoffset->X, imgoffset->Y, SafeRect.Width, SafeRect.Height);
+					canvas->Save();
+				} finally{ delete canvas; }
+			} else result = bitmap->Clone(rect, bitmap->PixelFormat);
+		}
+		return result;
+	}
+	System::Drawing::Rectangle^ MinSquare(System::Drawing::Rectangle rect) {
+		if (rect.Width > rect.Height)
+		{
+			rect.X += (rect.Width - rect.Height) / 2;
+			rect.Width = rect.Height;
+		} else if (rect.Width < rect.Height)
+		{
+			rect.Y += (rect.Height - rect.Width) / 2;
+			rect.Height = rect.Width;
+		}
+		return rect;
+	}
+	System::Drawing::Rectangle^ MaxSquare(System::Drawing::Rectangle rect)
+	{
+		Size size = rect.Size;
+		if (rect.Width > rect.Height)
+		{
+			rect.Y -= (rect.Width / 2) - (size.Height / 2);
+			rect.Height = rect.Width;
+
+		} else if (rect.Width < rect.Height)
+		{
+			rect.X -= (rect.Height / 2) - (size.Width / 2);
+			rect.Width = rect.Height;
+		}
+		return rect;
+	}
+	System::Drawing::Rectangle^ AspectRatio(int originalWidth, int originalHeight, int width, int height)
+	{
+		auto rect = gcnew System::Drawing::Rectangle(0, 0, originalWidth, originalHeight);
+		if (width == height) rect = MaxSquare(*rect);
+		else
+		{
+			float factor = width > height ? originalHeight / (float)height : originalWidth / (float)width;
+			auto finalWidth = width * factor;
+			auto finalHeight = height * factor;
+			rect = gcnew System::Drawing::Rectangle((int)((originalWidth - finalWidth) / 2),
+				(int)((originalHeight - finalHeight) / 2),
+				(int)finalWidth, (int)finalHeight);
+		}
+		return rect;
+	}
+
 	public class ColorInt {
 
 	public:
@@ -63,8 +154,16 @@ namespace GifUtil
 		
 		cli::array<unsigned char>^ times = gifImg->GetPropertyItem(0x5100)->Value;
 
-		width = gifImg->Width;
-		height = gifImg->Height;
+		System::Drawing::Rectangle^ AspectRatioRect = nullptr;
+		if (width == 0 || height == 0) {
+			width = gifImg->Width;
+			height = gifImg->Height;
+		} else {
+			AspectRatioRect = AspectRatio(gifImg->Width, gifImg->Height, width, height);
+			width = AspectRatioRect->Width;
+			height = AspectRatioRect->Height;
+		}
+		
 
 		std::vector<float> results;
 
@@ -92,16 +191,16 @@ namespace GifUtil
 
 			resultTextureSize = GifUtil::GifConvertInfo::OutputTextureSize;
 			if (GifUtil::GifConvertInfo::TextureSizeByDimension) {
-				int powof2 = System::Math::Log(resultTextureSize, 2)+ spriteDimension;
+				int powof2 = (int)System::Math::Log(resultTextureSize, 2)+ spriteDimension;
 				powof2 = powof2 <= 13 ? powof2 : 13;
-				resultTextureSize = System::Math::Pow(2, powof2);
+				resultTextureSize = (int)System::Math::Pow(2, powof2);
 			}
 
 			int frameSize = resultTextureSize / spriteDimension;
-			float diff = gifImg->Width < gifImg->Height ? (float)gifImg->Width / frameSize : (float)gifImg->Height / frameSize;
+			float diff = width < height ? (float)width / frameSize : (float)height / frameSize;
 
-			int frameWidth = gifImg->Width / diff;
-			int frameHeight = gifImg->Height / diff;
+			int frameWidth = (int)(width / diff);
+			int frameHeight = (int)(height / diff);
 
 			int extend = GifUtil::GifConvertInfo::FrameSizeExtend;
 			int halfextend = extend == 0 ? 0 : extend / 2;
@@ -129,8 +228,12 @@ namespace GifUtil
 						row = i / spriteDimension;
 						col = i - row * spriteDimension;
 						gifImg->SelectActiveFrame(dimension, i + k * frameCountPerSplit + (k >= extraFrame ? extraFrame : 0));
-
-						Bitmap^ frame = gcnew Bitmap(gifImg, frameWidth, frameHeight);
+						auto frame = gcnew Bitmap(gifImg, frameWidth, frameHeight);
+						if (AspectRatioRect != nullptr) {
+							frame = gcnew Bitmap(gifImg);
+							auto cutImg = Cut(frame, *AspectRatioRect);
+							frame = gcnew Bitmap(cutImg, frameWidth, frameHeight);
+						}
 						try
 						{
 							canvas->DrawImage(frame, col * (frameWidth + extend) + halfextend, row * (frameHeight + extend) + halfextend);
