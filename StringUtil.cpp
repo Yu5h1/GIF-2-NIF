@@ -47,3 +47,23 @@ vector<string> StringSplit(string txt, const string separator)
 	results.push_back(txt);
 	return results;
 }
+
+string TrimLeft(string txt,string arg, int offset)
+{
+	int index = txt.find(arg);
+	if (index > -1 && index < txt.size()) {
+		index += offset;
+		if (index > -1 && index < txt.size()) txt = txt.erase(0, index);
+	} 
+	return txt;
+}
+
+string TrimRight(string txt, string arg, int offset)
+{
+	int index = txt.find(arg);
+	if (index > -1 && index < txt.size()) {
+		index += offset+1;
+		if (index > -1 && index < txt.size()) txt = txt.erase(index, txt.size());
+	}
+	return txt;
+}

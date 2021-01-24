@@ -13,7 +13,8 @@ bool StringContainAll(string txt, vector<string> args);
 bool StringContainAny(string txt, vector<string> args);
 string StringReplace(string txt, const string from, const string to);
 vector<string> StringSplit(string txt, const string separator);
-
+string TrimLeft(string txt, string arg,int offset = 0);
+string TrimRight(string txt, string arg, int offset = 0);
 //template<typename T>
 //string Join(vector<T> objs, string separator = ",");
 template<typename T>

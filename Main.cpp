@@ -21,6 +21,10 @@ float GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
 bool GifUtil::GifConvertInfo::TextureSizeByDimension = false;
 
 string appFolder = getAppFolder();
+string appName = getAppName();
+string appFileName = getAppFileName();
+string appPath = getAppPath();
+
 string TagOfSpecificShapeName = "gif";
 string SizeMode = "";
 string nameSet = "";
@@ -30,72 +34,57 @@ bool FlipU = false;
 bool OverwriteNameSet = false;
 string texconvFormatArg = IsSpecialEdition ? "BC7_UNORM" : "BC1_UNORM";
 string texconv = appFolder + "\\texconv.exe";
-string SubFolder = "";
 
 bool DoesTexconvExists = System::IO::File::Exists(ToString_clr(texconv));
 
-string GifMeshTemplate() { return appFolder + "\\GifMeshTemplate.nif"; }
+string DefaultGifMeshTemplatePath = appFolder + "\\GifMeshTemplate.nif";
+string GifMeshTemplatePath = DefaultGifMeshTemplatePath;
 
-void GenerateGifMesh(System::String^ path) {
-	System::IO::File::WriteAllBytes(path, System::Convert::FromBase64String("R2FtZWJyeW8gRmlsZSBGb3JtYXQsIFZlcnNpb24gMjAuMi4wLjcKBwACFAEMAAAADQAAAFMAAAABAClPcHRpbWl6ZWQgd2l0aCBTU0UgTklGIE9wdGltaXplciB2My4wLjcuAAEACgAKAAAAQlNGYWRlTm9kZQoAAABOaVRyaVNoYXBlDwAAAE5pQWxwaGFQcm9wZXJ0eQ4AAABOaVRyaVNoYXBlRGF0YRgAAABCU0xpZ2h0aW5nU2hhZGVyUHJvcGVydHknAAAAQlNMaWdodGluZ1NoYWRlclByb3BlcnR5RmxvYXRDb250cm9sbGVyEwAAAE5pRmxvYXRJbnRlcnBvbGF0b3ILAAAATmlGbG9hdERhdGESAAAAQlNTaGFkZXJUZXh0dXJlU2V0CAAAAEJTWEZsYWdzAAABAAIAAwAEAAUABgAHAAcACAAFAAYACQBYAAAAYQAAAA8AAAAcAQAAZAAAACIAAAAIAAAAMAAAADAAAAAoAAAAIgAAAAgAAAAIAAAAAwAAAAcAAAAHAAAAZ2lmTm9kZQcAAABnaWZNZXNoAwAAAEJTWAAAAAAAAAAAAQAAAAwAAAD/////AAAIAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAgD//////AQAAAAEAAAAAAAAAAQAAAAAAAAD/////DgAIAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAgD//////AwAAAP////8AAAAAAAAAAAAEAAAAAgAAAP////8AAAAA/////+wSgAAAAAAEAAAAAVq14sEAAAAAyGEiQlm14kEAAAAAymEiQgR340EAAAAAkAkAQQN348EAAAAAdhEAQQEQAAAAAAHQ3qQ0AACAP4hdjrOqFp40AACAP9SdvbPQ3qQ0AACAP4hdjrNMoas0AACAP4CJPrMh+Dq8jtSGs7z7f7+nMaO8T/uws//yf78h+Dq8jtSGs7z7f7/uJT67c406s7r/f7+8+3+/C0SlNCL4Ojz+8n+/YwCfNKcxozy8+3+/C0SlNCL4Ojy6/3+/zrKrNPAlPjsAgBE6RE5EP3q9wUHt7AJCAAAAgD4AAAAAAAAAAAAAAAAAAAAAAACAPgAAgD4AAIA+AAD/////AgAGAAAAAQAAAQACAAIAAwAAAAAAAgAAAP////8AAAAABQAAAAEDQILRgAAAAAAAAAAAAAAAAIA/AACAPwkAAAAAAIA/AACAPwAAgD8AAIA/AwAAAAAAgD8AAAAAAABIQgAAgD8AAIA/AACAPwAAAD+amZk+AAAAQAoAAAAIAAAAgD8AAAAAAAAAAI/C9T0EAAAABgAAABQAAAAAAAAACAAAAAUAAAAFAAAAAAAAAAAAAACPwvU9AACAPo/CdT4AAAA/7FG4PgAAQD+PwvU+AACAPwUAAAAFAAAAAAAAAAAAAACPwvU8AACAPo/CdT0AAAA/7FG4PQAAQD+PwvU9AACAPwkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////CAAAAIA/AAAAAAAAAACPwvU+BAAAAAsAAAAWAAAA//9//wcAAAACAAAACwAAAAEAAAAAAAAA"));
+
+void GenerateGifMesh(string path) {
+	System::IO::File::WriteAllBytes(ToString_clr(path), System::Convert::FromBase64String("R2FtZWJyeW8gRmlsZSBGb3JtYXQsIFZlcnNpb24gMjAuMi4wLjcKBwACFAEMAAAADQAAAFMAAAABAClPcHRpbWl6ZWQgd2l0aCBTU0UgTklGIE9wdGltaXplciB2My4wLjcuAAEACgAKAAAAQlNGYWRlTm9kZQoAAABOaVRyaVNoYXBlDwAAAE5pQWxwaGFQcm9wZXJ0eQ4AAABOaVRyaVNoYXBlRGF0YRgAAABCU0xpZ2h0aW5nU2hhZGVyUHJvcGVydHknAAAAQlNMaWdodGluZ1NoYWRlclByb3BlcnR5RmxvYXRDb250cm9sbGVyEwAAAE5pRmxvYXRJbnRlcnBvbGF0b3ILAAAATmlGbG9hdERhdGESAAAAQlNTaGFkZXJUZXh0dXJlU2V0CAAAAEJTWEZsYWdzAAABAAIAAwAEAAUABgAHAAcACAAFAAYACQBYAAAAYQAAAA8AAAAcAQAAZAAAACIAAAAIAAAAMAAAADAAAAAoAAAAIgAAAAgAAAAIAAAAAwAAAAcAAAAHAAAAZ2lmTm9kZQcAAABnaWZNZXNoAwAAAEJTWAAAAAAAAAAAAQAAAAwAAAD/////AAAIAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAgD//////AQAAAAEAAAAAAAAAAQAAAAAAAAD/////DgAIAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAgD//////AwAAAP////8AAAAAAAAAAAAEAAAAAgAAAP////8AAAAA/////+wSgAAAAAAEAAAAAVq14sEAAAAAyGEiQlm14kEAAAAAymEiQgR340EAAAAAkAkAQQN348EAAAAAdhEAQQEQAAAAAAHQ3qQ0AACAP4hdjrOqFp40AACAP9SdvbPQ3qQ0AACAP4hdjrNMoas0AACAP4CJPrMh+Dq8jtSGs7z7f7+nMaO8T/uws//yf78h+Dq8jtSGs7z7f7/uJT67c406s7r/f7+8+3+/C0SlNCL4Ojz+8n+/YwCfNKcxozy8+3+/C0SlNCL4Ojy6/3+/zrKrNPAlPjsAgBE6RE5EP3q9wUHt7AJCAAAAgD4AAAAAAAAAAAAAAAAAAAAAAACAPgAAgD4AAIA+AAD/////AgAGAAAAAQAAAQACAAIAAwAAAAAAAgAAAP////8AAAAABQAAAAEDQILRgAAAAAAAAAAAAAAAAIA/AACAPwkAAAAAAIA/AACAPwAAgD8AAIA/AwAAAAAAgD8AAAAAAABIQgAAgD8AAIA/AACAPwAAAD+amZk+AAAAQAoAAAAIAAAAgD8AAAAAAAAAAI/C9T0EAAAABgAAABQAAAAAAAAACAAAAAUAAAAFAAAAAAAAAAAAAACPwvU9AACAPo/CdT4AAAA/7FG4PgAAQD+PwvU+AACAPwUAAAAFAAAAAAAAAAAAAACPwvU8AACAPo/CdT0AAAA/7FG4PQAAQD+PwvU9AACAPwkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////CAAAAIA/AAAAAAAAAACPwvU+BAAAAAsAAAAWAAAA//9//wcAAAACAAAACwAAAAEAAAAAAAAA"));
 }
 
-bool DoesMeshTemplateExists() {
-	return System::IO::File::Exists(gcnew System::String(GifMeshTemplate().c_str()));
-}
-
-
-
-void GenerateGifAssets(string outputFolder, std::string sourceGif, string replaceName)
+void GenerateGifAssets(string outputFolder, std::string sourcePath, string outputName)
 {
 	bool useGameFolder = outputFolder != "";
-	if (System::IO::File::Exists(gcnew System::String(sourceGif.c_str())) == false) {
-		MsgBox(sourceGif + "\n does not exists.");
-		return;
-	}
+	if (!DoesPathOccupied(sourcePath,true)) return;
 
-	string gifName = replaceName == "" ? GetFileNameWithoutExtension(sourceGif) : replaceName;
-
-	System::String^ GameDataFolder = gcnew System::String(outputFolder.c_str());
+	string gifName = outputName == "" ? GetFileNameWithoutExtension(sourcePath) : outputName;
 
 	string MeshOutputFolder = appFolder;
 	string TextureOutputFolder = appFolder;
 
-	string textureGifDir = "Textures" + SubFolder;
-
 	if (useGameFolder) {
-		if (System::IO::Directory::Exists(GameDataFolder) == false) {
-			MsgBox(GameDataFolder + "\n GameDataFolder does not exists.");
+		if (!DoesPathOccupied(outputFolder)) {
+			MsgBox(outputFolder + "\n GameDataFolder does not exists.");
 			return;
 		}
-		System::String^ MOF = GameDataFolder + "\\meshes"+ ToString_clr(SubFolder);
-		System::String^ TOF = GameDataFolder + "\\" + gcnew System::String(textureGifDir.c_str());
-		if (System::IO::Directory::Exists(MOF) == false) { System::IO::Directory::CreateDirectory(MOF); }
-		if (System::IO::Directory::Exists(TOF) == false) { System::IO::Directory::CreateDirectory(TOF); }
-		MeshOutputFolder = MarshalString(MOF);
-		TextureOutputFolder = MarshalString(TOF);
+		string MOF = outputFolder + "\\meshes";
+		string TOF = outputFolder + "\\textures";
+		if (DoesPathOccupied(MOF) == false) { System::IO::Directory::CreateDirectory(ToString_clr(MOF)); }
+		if (DoesPathOccupied(TOF) == false) { System::IO::Directory::CreateDirectory(ToString_clr(TOF)); }
+		MeshOutputFolder = MOF;
+		TextureOutputFolder = TOF;
 	}
-
-	System::String^ MeshTemplatePath = gcnew System::String(GifMeshTemplate().c_str());
-
 	string nifoutput = MeshOutputFolder + "\\" + gifName + ".nif";
 	auto outputPng = ToString_clr(TextureOutputFolder + "\\" + gifName + ".png");
 
 	NifFile target;
 
-	if (DoesMeshTemplateExists()) {
-		target.Load(MarshalString(MeshTemplatePath));
-	}
-	else {
-		GenerateGifMesh(ToString_clr(nifoutput.c_str()));
-		target.Load(nifoutput);
+	if (DoesPathOccupied(GifMeshTemplatePath)) {
+		target.Load(GifMeshTemplatePath);
+	}else {
+		if (GifMeshTemplatePath == DefaultGifMeshTemplatePath) {
+			GenerateGifMesh(nifoutput);
+			target.Load(nifoutput);
+		} else MsgBox(GifMeshTemplatePath+"\n is not exists ! ");
 	}
 	BSXFlags* bsxFlags = nullptr;
 	auto extraDatas = target.GetRootNode()->GetExtraData();
 	if (extraDatas.GetSize() > 0) {
 		for (auto extradata : extraDatas)
 		{
-			
 			if (target.GetHeader().GetBlockTypeStringById(extradata.GetIndex()) == "BSXFlags") {
 				bsxFlags = target.GetHeader().GetBlock<BSXFlags>(extradata.GetIndex());
 				break;
@@ -119,13 +108,14 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 	}
 	int spriteDimension, resultTextureSize;
 
-	vector<float> gifKeysTimes = GifUtil::ConvertToSpriteSheets(gcnew System::String(sourceGif.c_str()), 1,
+	vector<float> gifKeysTimes = GifUtil::ConvertToSpriteSheets(ToString_clr(sourcePath), 1,
 		gifWidth, gifHeight, timeLength, outputPng, spriteDimension, resultTextureSize);
 
-	string TextureSlotValue = textureGifDir + "\\" + gifName ;
+	string TextureSlotValue = "textures\\" + gifName ;
 
 	if (spriteDimension < 2) return;
 	if (System::IO::File::Exists(outputPng)) {
+		TextureOutputFolder = MarshalString(System::IO::Path::GetDirectoryName(outputPng));
 		string textureSizeString = to_string(resultTextureSize);
 		if (DoesTexconvExists) {
 			Process^ convertddsProcess = gcnew Process();
@@ -201,7 +191,6 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 		int columnControllerIndex = shader->GetControllerRef();
 		if (columnControllerIndex < 0) {
 			auto columnController = new BSLightingShaderPropertyFloatController();			
-			
 			columnController->SetFlags(8);
 			columnController->SetTypeOfControlledVariable(20);
 			columnController->SetTargetRef(shaderIndex);
@@ -274,20 +263,12 @@ void GenerateGifAssets(string outputFolder, std::string sourceGif, string replac
 	target.PrettySortBlocks();
 	target.Save(nifoutput);
 }
-System::String^ GetlegalFileName(System::String^ filename) {
+System::String^ MakeLegalFilePath(System::String^ filename) {
 	auto illeagalChar = (gcnew System::String("*:?\"<>|"))->ToCharArray();
 	filename = filename->Replace("/", "\\");
 	filename = filename->Replace("\\\\", "\\");
 	auto sep = gcnew cli::array<System::Char>{ '\\' };
 	auto separateParts = filename->Split(sep, System::StringSplitOptions::None);
-
-	if (separateParts->Length > 1) {
-		SubFolder = "";
-		for (int i = 0; i < separateParts->Length-1; i++)
-		{
-			SubFolder += "\\"+MarshalString(separateParts[i]);
-		}
-	}
 	filename = separateParts[separateParts->Length - 1];
 
 	for (int i = 0; i < illeagalChar->Length; i++)
@@ -315,13 +296,6 @@ System::String^ SetValue(System::String^ itemName, float val, System::String^ co
 System::String^ SetValue(System::String^ itemName, std::string val, System::String^ comment = "") { return SetValue(itemName, ToString_clr(val), comment); }
 
 void CreateConfig(System::String^ path) {
-	auto nameprefix = ToString_clr(SubFolder == "" ? "" : SubFolder + "\\") ;
-	if (nameprefix != "") {
-		while (nameprefix->StartsWith("\\"))
-		{
-			nameprefix = nameprefix->Remove(0, 1);
-		}
-	}
 	System::IO::File::WriteAllText(path, gcnew System::String(
 		SetValue("GameDataPath", outputFolderPath) +
 		SetValue("averageFrameRate", GifUtil::GifConvertInfo::averageFrameRate) +
@@ -329,7 +303,7 @@ void CreateConfig(System::String^ path) {
 		SetValue("maxMeshSize", MaxMeshSize) +
 		SetValue("FilterColor", GifUtil::GifConvertInfo::filterColor, "black , pureblack") +
 		SetValue("FlipU", FlipU) +
-		SetValue("NameSet", MarshalString(nameprefix)+nameSet) +
+		SetValue("NameSet", nameSet) +
 		SetValue("OverwriteNameSet", OverwriteNameSet) +
 		SetValue("TexconvFormatArg", texconvFormatArg) +
 		SetValue("TagOfSpecificShapeName", TagOfSpecificShapeName) +
@@ -338,82 +312,107 @@ void CreateConfig(System::String^ path) {
 		//"FrameSizeExtend=0"
 	));
 }
+void ShowSetting() {
+	MsgBox("gamedatapath=" + outputFolderPath +
+		"\naverageframerate=" + to_string(GifUtil::GifConvertInfo::averageFrameRate) +
+		"\ntexturesize=" + to_string(GifUtil::GifConvertInfo::OutputTextureSize) +
+		"\nmaxmeshsize=" + to_string(MaxMeshSize) +
+		"\nfiltercolor=" + GifUtil::GifConvertInfo::filterColor +
+		"\nnameset=" + nameSet +
+		"\noverwritenameset=" + (OverwriteNameSet ? "true" : "false") +
+		"\nflipu=" + (FlipU ? "true" : "false") +
+		"\ntagofspecificshapename=" + TagOfSpecificShapeName +
+		"\ntexconvformatarg=" + texconvFormatArg +
+		"\nsizemode=" + SizeMode +
+		"\nGifMeshTemplatePath="+GifMeshTemplatePath);
+}
+void LoadSetting(vector<string> lines) {
+	for (int i = 0; i < lines.size(); i++)
+	{		
+		auto data = StringSplit(lines[i], "=");
+		if (data.size() > 1) {			
+			auto item = StringTolower(data[0]);
+			auto stringVal = data[1];
+			for (auto symbol : { "-",";" }) stringVal = TrimRight(stringVal, symbol, -1);
+			auto val = StringReplace(StringReplace(stringVal, " ", ""), "\t", "");
+			bool boolVal = val == "true" || val == "1";
+			stringstream ss(val);
+			if (item == "gamedatapath") outputFolderPath = stringVal;
+			else if (item == "averageframerate") ss >> GifUtil::GifConvertInfo::averageFrameRate;
+			else if (item == "texturesize") ss >> GifUtil::GifConvertInfo::OutputTextureSize;
+			else if (item == "maxmeshsize") ss >> MaxMeshSize;
+			else if (item == "filtercolor") GifUtil::GifConvertInfo::filterColor = val;
+			else if (item == "nameset") nameSet = stringVal;
+			else if (item == "overwritenameset") OverwriteNameSet = boolVal;
+			else if (item == "flipu") FlipU = boolVal;
+			else if (item == "tagofspecificshapename") TagOfSpecificShapeName = stringVal;
+			else if (item == "texconvformatarg") texconvFormatArg = val;
+			else if (item == "sizemode") { SizeMode = val; }
+			else if (item == "gifmeshtemplatepath") {
+				GifMeshTemplatePath = stringVal; 
+				if (!StringContain(GifMeshTemplatePath,":\\")) 
+					GifMeshTemplatePath = appFolder + "\\" + GifMeshTemplatePath;
+				if (!StringContain(GifMeshTemplatePath, ".nif"))
+					GifMeshTemplatePath += ".nif";
+			}
+		}
+	}
+	if (GifUtil::GifConvertInfo::averageFrameRate <= 0) GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
+}
 
 int main(int argc, char* argv[], char* const envp[])
 {	
-	auto appName = System::IO::Path::GetFileNameWithoutExtension(ToString_clr(getAppPath()));
-	auto config = gcnew System::String(appFolder.c_str()) + "\\" + appName + ".config";	
+	auto configPath = appFolder + "\\" + appName + ".config";
+
+	if (DoesPathOccupied(configPath)) {
+		LoadSetting(ReadAllLines(configPath));
+	}else { CreateConfig(ToString_clr(configPath)); }
 
 	if (!DoesTexconvExists) {
 		MsgBox("texconv.exe\n does not exists.\n image will convert to PNG");
 	}
 
-	if (System::IO::File::Exists(config)) {
-		auto lines = System::IO::File::ReadAllLines(config);
-		for (int i = 0; i < lines->Length; i++)
-		{
-			auto data = lines[i]->Split('=');
-			if (data->Length > 1) {
-				auto item = data[0]->ToLower();		
-				auto stringVal = data[1]->Split(';','-')[0];
-				auto MarshalTextVal = MarshalString(stringVal);
-
-				auto NoSpaceValue = stringVal->Split(' ', '\t')[0];
-
-				auto val = MarshalString(NoSpaceValue);
-				bool boolVal = val == "true" || val == "1";
-				stringstream ss(val);
-				if (item == "gamedatapath") outputFolderPath = MarshalTextVal;
-				else if (item == "averageframerate") ss >> GifUtil::GifConvertInfo::averageFrameRate;
-				else if (item == "texturesize") ss >> GifUtil::GifConvertInfo::OutputTextureSize;
-				else if (item == "maxmeshsize") ss >> MaxMeshSize;
-				else if (item == "filtercolor") GifUtil::GifConvertInfo::filterColor = val;
-				else if (item == "nameset") nameSet = MarshalString(GetlegalFileName(stringVal));
-				else if (item == "overwritenameset") OverwriteNameSet = boolVal;
-				else if (item == "flipu") FlipU = boolVal;
-				else if (item == "tagofspecificshapename") TagOfSpecificShapeName = MarshalTextVal;
-				else if (item == "texconvformatarg") texconvFormatArg = val;
-				else if (item == "sizemode") { SizeMode = val; }
-			}
-			
-		}
-		if (GifUtil::GifConvertInfo::averageFrameRate <= 0) GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
-	}else { CreateConfig(config); }
-
+	//ShowSetting();
 	//return 0;
-
+	vector<string> gifImgs;
 	if (argc == 1) {
-		CreateConfig(config);
-
+		CreateConfig(ToString_clr(configPath));
 		MsgBox("Welecom to use Skyrim Gif " +
 			string(IsSpecialEdition ? "SpecialEdition (SE)" : "Legendary Edition (LE)") +
 			"\n\nUsage:\n" +
 			"Drag drop your gif files over this app then drop.\n" +
 			"Please download \"texconv\" for convert dds.\n\n"
 		);
-		if (DoesMeshTemplateExists() == false) GenerateGifMesh(gcnew System::String(GifMeshTemplate().c_str()));
+		if (!DoesPathOccupied(DefaultGifMeshTemplatePath)) GenerateGifMesh(DefaultGifMeshTemplatePath);
 		return 0;
-	}
-	int LastNum = 0;
-	if (nameSet != "" && !OverwriteNameSet) {
-		auto outputPath = System::IO::Directory::Exists(ToString_clr(outputFolderPath)) ?
-			outputFolderPath : appFolder;
-		LastNum = System::IO::Directory::GetFiles(ToString_clr(outputPath), ToString_clr(nameSet + "*.nif"))->Length;
-	}
-	for (size_t i = 1; i < argc; i++)
+	} else
 	{
-		auto curFileType = System::IO::Path::GetExtension(ToString_clr(argv[i]))->ToLower();
-		if (curFileType == ".gif") {
-			string curReplaceName = "";
-			if (nameSet != "") {
-				int num = i + LastNum;
-				curReplaceName = nameSet + MarshalString(num.ToString("00"));
-			}
-			GenerateGifAssets(outputFolderPath, argv[i], curReplaceName);
-		}else print("\nFailed to convert" + string(argv[i]));
+		vector<string> overwriteSettingList;
+		for (int i = 1; i < argc; i++) {
+			if (StringContain(argv[i], ".gif")) gifImgs.push_back(argv[i]);
+			else if (StringContain(argv[i],"="))
+				overwriteSettingList.push_back(argv[i]);
+		}
+		LoadSetting(overwriteSettingList);
 	}
 
+	int LastNum = 1;	
+	if (nameSet != "" && !OverwriteNameSet) {
+		auto outputFolder = DoesPathOccupied(outputFolderPath) ? outputFolderPath+"\\meshes" : appFolder;
+		if (DoesPathOccupied(outputFolder)) {
+			int existsAssetsCount = System::IO::Directory::GetFiles(ToString_clr(outputFolder), ToString_clr(nameSet + "*.nif"))->Length;
+			if (existsAssetsCount > 0) LastNum = existsAssetsCount;
+		}
+	}
+	for (int i = 0; i < gifImgs.size(); i++)
+	{
+		string outputName = "";
+		if (nameSet != "") {
+			int num = i + LastNum;
+			outputName = nameSet + MarshalString(num.ToString("00"));
+		}		
+		GenerateGifAssets(outputFolderPath, gifImgs[i], outputName);
+	}
 	print("\n\nConvert Gif Completed");
-
 	return 0;
 }
