@@ -8,8 +8,26 @@
 #include <DebugUtil.h>
 #include <PathUtil.h>
 #include <StringUtil.h>
+#include <access_private.hpp>
 
 using namespace std;
+
+ACCESS_PRIVATE_FIELD(NiTimeController, ushort, flags)
+ACCESS_PRIVATE_FIELD(NiTimeController, float, startTime)
+ACCESS_PRIVATE_FIELD(NiTimeController, float, stopTime)
+ACCESS_PRIVATE_FIELD(NiTimeController, float, frequency)
+ACCESS_PRIVATE_FIELD(NiTimeController, float, phase)
+void setFlags(BSLightingShaderPropertyFloatController &controller,ushort _flags) 
+{ access_private::flags(dynamic_cast<NiTimeController&>(controller)) = _flags; }
+void setStartTime(BSLightingShaderPropertyFloatController &controller, float _startTime) 
+{ access_private::startTime(dynamic_cast<NiTimeController&>(controller)) = _startTime; }
+void setStopTime(BSLightingShaderPropertyFloatController &controller, float _stopTime) 
+{ access_private::stopTime(dynamic_cast<NiTimeController&>(controller)) = _stopTime; }
+void setFrequency(BSLightingShaderPropertyFloatController &controller, float _frequency)
+{ access_private::frequency(dynamic_cast<NiTimeController&>(controller)) = _frequency; }
+void setPhase(BSLightingShaderPropertyFloatController &controller, float _phase)
+{ access_private::phase(dynamic_cast<NiTimeController&>(controller)) = _phase; }
+
 
 System::String^ ToString_clr(string txt) { return gcnew System::String(txt.c_str()); }
 
@@ -78,7 +96,10 @@ void GenerateGifAssets(string outputFolder, std::string sourcePath, string outpu
 		if (GifMeshTemplatePath == DefaultGifMeshTemplatePath) {
 			GenerateGifMesh(nifoutput);
 			target.Load(nifoutput);
-		} else MsgBox(GifMeshTemplatePath+"\n is not exists ! ");
+		} else {
+			MsgBox(GifMeshTemplatePath + "\n template mesh does not exists ! ");
+			return;
+		} 
 	}
 	BSXFlags* bsxFlags = nullptr;
 	auto extraDatas = target.GetRootNode()->GetExtraData();
@@ -189,8 +210,9 @@ void GenerateGifAssets(string outputFolder, std::string sourcePath, string outpu
 		gifKeysTimes.insert(gifKeysTimes.begin(), 0);
 
 		int columnControllerIndex = shader->GetControllerRef();
-		if (columnControllerIndex < 0) {
-			auto columnController = new BSLightingShaderPropertyFloatController();			
+		if (columnControllerIndex < 0) {						
+			//auto columnControllerc = CreateFloatController(8);
+			auto columnController = new BSLightingShaderPropertyFloatController();
 			columnController->SetFlags(8);
 			columnController->SetTypeOfControlledVariable(20);
 			columnController->SetTargetRef(shaderIndex);
@@ -360,8 +382,13 @@ void LoadSetting(vector<string> lines) {
 	if (GifUtil::GifConvertInfo::averageFrameRate <= 0) GifUtil::GifConvertInfo::averageFrameRate = 0.1f;
 }
 
+
 int main(int argc, char* argv[], char* const envp[])
 {	
+
+	
+
+	
 	auto configPath = appFolder + "\\" + appName + ".config";
 
 	if (DoesPathOccupied(configPath)) {
@@ -396,7 +423,7 @@ int main(int argc, char* argv[], char* const envp[])
 		LoadSetting(overwriteSettingList);
 	}
 
-	int LastNum = 1;	
+	int LastNum = 1;
 	if (nameSet != "" && !OverwriteNameSet) {
 		auto outputFolder = DoesPathOccupied(outputFolderPath) ? outputFolderPath+"\\meshes" : appFolder;
 		if (DoesPathOccupied(outputFolder)) {
